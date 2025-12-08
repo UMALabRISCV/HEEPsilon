@@ -101,8 +101,10 @@ module heepsilon_top #(
   logic peripheral_subsystem_powergate_switch_ack_n;
   /* verilator lint_on unused */
 
-  // HW FIFO signals (unused in HEEPsilon)
+  // HW FIFO signals (unused in HEEPsilon - no HW FIFO implementation)
+  /* verilator lint_off UNUSEDSIGNAL */
   fifo_req_t  [core_v_mini_mcu_pkg::DMA_CH_NUM-1:0] hw_fifo_req;
+  /* verilator lint_on UNUSEDSIGNAL */
   fifo_resp_t [core_v_mini_mcu_pkg::DMA_CH_NUM-1:0] hw_fifo_resp;
 
   // CGRA logic clock gating unit enable (always-on in this case)

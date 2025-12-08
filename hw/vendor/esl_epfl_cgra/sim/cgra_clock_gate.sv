@@ -16,7 +16,7 @@ module cgra_clock_gate
   always_latch
   begin
     if (clk_i == 1'b0)
-      clk_en <= en_i | test_en_i;
+      clk_en = en_i | test_en_i;  // Use blocking assignment in latch
   end
 
   assign clk_o = clk_i & clk_en;
