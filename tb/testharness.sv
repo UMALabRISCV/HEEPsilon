@@ -77,7 +77,7 @@ module testharness #(
       .jtag_trst_ni(sim_jtag_trstn),
       .jtag_tdi_i(sim_jtag_tdi),
       .jtag_tdo_o(sim_jtag_tdo),
-      .gpio_io(gpio[22:0]),
+      .gpio_io(gpio[18:0]),
       .uart_rx_i(uart_rx),
       .uart_tx_o(uart_tx),
       .spi_flash_sd_io(spi_flash_sd_io),
@@ -110,8 +110,8 @@ module testharness #(
   logic [EXT_DOMAINS_RND-1:0] delayed_tb_external_subsystem_powergate_switch_ack_n;
 
   always_ff @(negedge clk_i) begin
-    tb_cpu_subsystem_powergate_switch_ack_n[0] <= heepsilon_top_i.x_heep_system_i.cpu_subsystem_powergate_switch_n;
-    tb_peripheral_subsystem_powergate_switch_ack_n[0] <= heepsilon_top_i.x_heep_system_i.peripheral_subsystem_powergate_switch_n;
+    tb_cpu_subsystem_powergate_switch_ack_n[0] <= heepsilon_top_i.cpu_subsystem_powergate_switch_n;
+    tb_peripheral_subsystem_powergate_switch_ack_n[0] <= heepsilon_top_i.peripheral_subsystem_powergate_switch_n;
     tb_memory_subsystem_banks_powergate_switch_ack_n[0] <= heepsilon_top_i.x_heep_system_i.core_v_mini_mcu_i.memory_subsystem_banks_powergate_switch_n;
     tb_external_subsystem_powergate_switch_ack_n[0] <= heepsilon_top_i.external_subsystem_powergate_switch_n;
     for (int i = 0; i < SWITCH_ACK_LATENCY; i++) begin
@@ -134,8 +134,8 @@ module testharness #(
     force heepsilon_top_i.x_heep_system_i.core_v_mini_mcu_i.memory_subsystem_banks_powergate_switch_ack_n = delayed_tb_memory_subsystem_banks_powergate_switch_ack_n;
     force external_subsystem_powergate_switch_ack_n = delayed_tb_external_subsystem_powergate_switch_ack_n;
 `else
-    heepsilon_top_i.x_heep_system_i.cpu_subsystem_powergate_switch_ack_n = delayed_tb_cpu_subsystem_powergate_switch_ack_n;
-    heepsilon_top_i.x_heep_system_i.peripheral_subsystem_powergate_switch_ack_n = delayed_tb_peripheral_subsystem_powergate_switch_ack_n;
+    heepsilon_top_i.cpu_subsystem_powergate_switch_ack_n = delayed_tb_cpu_subsystem_powergate_switch_ack_n;
+    heepsilon_top_i.peripheral_subsystem_powergate_switch_ack_n = delayed_tb_peripheral_subsystem_powergate_switch_ack_n;
     heepsilon_top_i.x_heep_system_i.core_v_mini_mcu_i.memory_subsystem_banks_powergate_switch_ack_n = delayed_tb_memory_subsystem_banks_powergate_switch_ack_n;
     heepsilon_top_i.external_subsystem_powergate_switch_ack_n = delayed_tb_external_subsystem_powergate_switch_ack_n;
 `endif
