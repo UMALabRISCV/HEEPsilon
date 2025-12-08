@@ -34,7 +34,7 @@ filesets:
     files:
     - hw/vendor/esl_epfl_x_heep/tb/testharness_pkg.sv
     - hw/vendor/esl_epfl_x_heep/tb/ext_bus.sv
-    - hw/vendor/esl_epfl_x_heep/tb/ext_xbar.sv
+    - hw/rtl/ext_xbar.sv  # HEEPsilon custom ext_xbar (no NAPOT for CGRA compatibility)
     file_type: systemVerilogSource
 
 
