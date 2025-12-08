@@ -32,6 +32,7 @@ filesets:
     depend:
     - x-heep::packages
     files:
+    - hw/vendor/esl_epfl_x_heep/tb/testharness_pkg.sv
     - hw/vendor/esl_epfl_x_heep/tb/ext_bus.sv
     - hw/vendor/esl_epfl_x_heep/tb/ext_xbar.sv
     file_type: systemVerilogSource

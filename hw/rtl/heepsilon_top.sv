@@ -49,6 +49,7 @@ module heepsilon_top #(
 
   import obi_pkg::*;
   import reg_pkg::*;
+  import fifo_pkg::*;
   import heepsilon_pkg::*;
 
   // External xbar master/slave and peripheral ports
@@ -92,10 +93,34 @@ module heepsilon_top #(
   logic external_subsystem_powergate_switch_ack_n;
   logic external_subsystem_powergate_iso_n;
 
+  // New signals for x-heep v1.0.4
+  logic cpu_subsystem_powergate_switch_n;
+  logic cpu_subsystem_powergate_switch_ack_n;
+  logic peripheral_subsystem_powergate_switch_n;
+  logic peripheral_subsystem_powergate_switch_ack_n;
+  /* verilator lint_on unused */
+
+  // HW FIFO signals (unused in HEEPsilon)
+  fifo_req_t  [core_v_mini_mcu_pkg::DMA_CH_NUM-1:0] hw_fifo_req;
+  fifo_resp_t [core_v_mini_mcu_pkg::DMA_CH_NUM-1:0] hw_fifo_resp;
+
   // CGRA logic clock gating unit enable (always-on in this case)
   assign cgra_enable                    = 1'b1;
   assign cgra_logic_rst_n               = external_subsystem_rst_n;
   assign cgra_ram_banks_set_retentive_n = external_ram_banks_set_retentive_n;
+
+  // Tie off powergate ack signals (always acknowledge power gate requests)
+  assign cpu_subsystem_powergate_switch_ack_n = cpu_subsystem_powergate_switch_n;
+  assign peripheral_subsystem_powergate_switch_ack_n = peripheral_subsystem_powergate_switch_n;
+
+  // HW FIFO responses (unused - all zeros)
+  always_comb begin
+    for (int i = 0; i < core_v_mini_mcu_pkg::DMA_CH_NUM; i++) begin
+      hw_fifo_resp[i].ready = 1'b0;
+      hw_fifo_resp[i].rdata = '0;
+      hw_fifo_resp[i].err   = 1'b0;
+    end
+  end
 
   always_comb begin
     // All interrupt lines set to zero by default
@@ -166,6 +191,10 @@ module heepsilon_top #(
       .X_EXT(X_EXT),
       .EXT_XBAR_NMASTER(CGRA_XBAR_NMASTER)
   ) x_heep_system_i (
+      // IDs (new in x-heep v1.0.4)
+      .hart_id_i(32'h0),
+      .xheep_instance_id_i(32'h0),
+      // Clock and reset
       .clk_i,
       .rst_ni,
       .jtag_tck_i,
@@ -230,6 +259,7 @@ module heepsilon_top #(
 
       .exit_value_o,
       .intr_vector_ext_i(ext_intr_vector),
+      .intr_ext_peripheral_i(1'b0),
       .xif_compressed_if(ext_if),
       .xif_issue_if(ext_if),
       .xif_commit_if(ext_if),
@@ -251,6 +281,15 @@ module heepsilon_top #(
       .ext_dma_write_resp_i(heep_dma_write_ch0_resp),
       .ext_dma_addr_req_o(heep_dma_addr_ch0_req),
       .ext_dma_addr_resp_i(heep_dma_addr_ch0_resp),
+      // HW FIFO interface (new in x-heep v1.0.4)
+      .hw_fifo_req_o(hw_fifo_req),
+      .hw_fifo_resp_i(hw_fifo_resp),
+      .hw_fifo_done_i('0),
+      // Powergate signals (new in x-heep v1.0.4)
+      .cpu_subsystem_powergate_switch_no(cpu_subsystem_powergate_switch_n),
+      .cpu_subsystem_powergate_switch_ack_ni(cpu_subsystem_powergate_switch_ack_n),
+      .peripheral_subsystem_powergate_switch_no(peripheral_subsystem_powergate_switch_n),
+      .peripheral_subsystem_powergate_switch_ack_ni(peripheral_subsystem_powergate_switch_ack_n),
       .external_subsystem_clkgate_en_no(external_subsystem_clkgate_en_n),
       .ext_peripheral_slave_req_o(ext_periph_slave_req),
       .ext_peripheral_slave_resp_i(ext_periph_slave_resp),
@@ -266,7 +305,12 @@ module heepsilon_top #(
       .dma_done_o(),
 
       .external_subsystem_rst_no(external_subsystem_rst_n),
-      .external_ram_banks_set_retentive_no(external_ram_banks_set_retentive_n)
+      .external_ram_banks_set_retentive_no(external_ram_banks_set_retentive_n),
+      // SPI Slave interface (new in x-heep v1.0.4, directly open for now)
+      .spi_slave_sck_io(),
+      .spi_slave_cs_io(),
+      .spi_slave_miso_io(),
+      .spi_slave_mosi_io()
   );
 
 endmodule  // heepsilon_pkg
