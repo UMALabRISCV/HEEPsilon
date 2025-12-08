@@ -129,6 +129,17 @@ typedef uint32_t*   kcom_mem_t;
 
 typedef int32_t*    kcom_io_t;
 
+/**
+ * @brief Macro to convert a 2D I/O array to a linear pointer for kcom_kernel_t.
+ * 
+ * Kernel I/O arrays are declared as 2D (cgra_input[COLS][DEPTH]) for clarity,
+ * but kcom_kernel_t expects linear int32_t* pointers for generic handling.
+ * Using &arr[0][0] provides a constant expression suitable for static initializers.
+ * 
+ * Usage: .input = KCOM_IO_PTR(cgra_input),
+ */
+#define KCOM_IO_PTR(arr) (&(arr)[0][0])
+
 typedef kcom_time_t kcom_param_t;
 
 typedef struct

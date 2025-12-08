@@ -77,6 +77,8 @@ inline __attribute__((always_inline)) void pinLow(  uint8_t pin );
 uint64_t    getTime_cy();
 void        timeStart(    kcom_time_diff_t    *perf );
 void        timeStop(     kcom_time_diff_t    *perf );
+void        pinInit();
+void        timerInit();
 
 /****************************************************************************/
 /**                                                                        **/

@@ -93,8 +93,8 @@
         .col_n  = CGRA_COLS,
         .in_n   = IN_VAR_DEPTH,
         .out_n  = OUT_VAR_DEPTH,
-        .input  = cgra_input,
-        .output = cgra_output,
+        .input  = KCOM_IO_PTR(cgra_input),
+        .output = KCOM_IO_PTR(cgra_output),
         .config = config,
         .func   = software,
         .check  = check,
@@ -114,9 +114,9 @@
             i_w_soft[i] = kcom_getRand() % (UINT_MAX - 1 - 0 + 1) + 0;
             i_w_cgra[i] = i_w_soft[i];
         }
-        cgra_input[0][0] = i_w_cgra;
-        cgra_input[1][0] = i_w_cgra;
-        cgra_input[0][1] = i_w_cgra;
+        cgra_input[0][0] = (int32_t)i_w_cgra;
+        cgra_input[1][0] = (int32_t)i_w_cgra;
+        cgra_input[0][1] = (int32_t)i_w_cgra;
         cgra_input[1][1] = 80;
 
     }
@@ -215,8 +215,8 @@
         .col_n  = CGRA_COLS,
         .in_n   = IN_VAR_DEPTH,
         .out_n  = OUT_VAR_DEPTH,
-        .input  = cgra_input,
-        .output = cgra_output,
+        .input  = KCOM_IO_PTR(cgra_input),
+        .output = KCOM_IO_PTR(cgra_output),
         .config = config,
         .func   = software,
         .check  = check,
@@ -237,14 +237,14 @@
             i_w_soft[i] = kcom_getRand() % (UINT_MAX - 1 - 0 + 1) + 0;
             i_w_cgra[i] = i_w_soft[i];
         }
-        cgra_input[0][0] = i_w_cgra;
+        cgra_input[0][0] = (int32_t)i_w_cgra;
 
-        cgra_input[1][0] = i_w_cgra;
-        cgra_input[1][1] = i_w_cgra;
-        cgra_input[1][2] = i_w_cgra;
+        cgra_input[1][0] = (int32_t)i_w_cgra;
+        cgra_input[1][1] = (int32_t)i_w_cgra;
+        cgra_input[1][2] = (int32_t)i_w_cgra;
 
         cgra_input[2][0] = N_ITERS;
-        cgra_input[2][1] = i_w_cgra;
+        cgra_input[2][1] = (int32_t)i_w_cgra;
     }
 
     void software(void)
@@ -340,8 +340,8 @@
         .col_n  = CGRA_COLS,
         .in_n   = 2,
         .out_n  = 1,
-        .input  = cgra_input,
-        .output = cgra_output,
+        .input  = KCOM_IO_PTR(cgra_input),
+        .output = KCOM_IO_PTR(cgra_output),
         .config = config,
         .func   = software,
         .check  = check,
@@ -361,11 +361,11 @@
             i_W_soft[i] = kcom_getRand() % (UINT_MAX - 1 - 0 + 1) + 0;
             i_W_cgra[i] = i_W_soft[i];
         }
-        cgra_input[0][0] = i_W_cgra;
-        cgra_input[1][0] = i_W_cgra;
-        cgra_input[2][0] = i_W_cgra;
-        cgra_input[3][0] = i_W_cgra;
-        cgra_input[3][1] = i_W_cgra;
+        cgra_input[0][0] = (int32_t)i_W_cgra;
+        cgra_input[1][0] = (int32_t)i_W_cgra;
+        cgra_input[2][0] = (int32_t)i_W_cgra;
+        cgra_input[3][0] = (int32_t)i_W_cgra;
+        cgra_input[3][1] = (int32_t)i_W_cgra;
 
     }
 

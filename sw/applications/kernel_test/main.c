@@ -103,7 +103,7 @@ static kcom_stats_t stats;
 /**                                                                        **/
 /****************************************************************************/
 
-void main()
+int main(void)
 {
     uint8_t kernels_n = sizeof( kernels ) / sizeof( kcom_kernel_t * );
     kcom_kernel_t* kernel;
@@ -188,14 +188,14 @@ void main()
             kcom_printPerf( &kperf );
 #endif //PRINT_ITERATION_VALUES
             /* Add this iteration to the runs vector */
-            kcom_populateRun( &run, &kperf, it_idx );
+            kcom_populateRun( run, &kperf, it_idx );
 #endif //MEASUREMENTS
         }
 #if MEASUREMENTS
         // Compute the conf time for each iteration. The iteration 0 is assigned the average, and its is subtracted to the cgra operation.
-        kcom_extractConfTime( &run, stats.n );
+        kcom_extractConfTime( run, stats.n );
         /* Get statistical values from the whole set of runs for this kernel. */
-        kcom_getKernelStats( &run, &stats );
+        kcom_getKernelStats( run, &stats );
         kcom_printKernelStats( &stats );
 #endif //MEASUREMENTS
 

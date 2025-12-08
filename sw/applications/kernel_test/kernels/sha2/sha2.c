@@ -91,8 +91,8 @@
         .col_n  = CGRA_COLS,
         .in_n   = IN_VAR_DEPTH,
         .out_n  = OUT_VAR_DEPTH,
-        .input  = cgra_input,
-        .output = cgra_output,
+        .input  = KCOM_IO_PTR(cgra_input),
+        .output = KCOM_IO_PTR(cgra_output),
         .config = config,
         .func   = software,
         .check  = check,
@@ -115,7 +115,7 @@
         }
         cgra_input[0][0] = N_ITERS;
         cgra_input[0][2] = 1518500249;
-        cgra_input[0][1] = i_W_cgra;
+        cgra_input[0][1] = (int32_t)i_W_cgra;
 
     }
 
@@ -217,8 +217,8 @@
         .col_n  = CGRA_COLS,
         .in_n   = IN_VAR_DEPTH,
         .out_n  = OUT_VAR_DEPTH,
-        .input  = cgra_input,
-        .output = cgra_output,
+        .input  = KCOM_IO_PTR(cgra_input),
+        .output = KCOM_IO_PTR(cgra_output),
         .config = config,
         .func   = software,
         .check  = check,
@@ -238,7 +238,7 @@
             i_W_soft[i] = kcom_getRand() % (UINT_MAX - 1 - 0 + 1) + 0;
             i_W_cgra[i] = i_W_soft[i];
         }
-        cgra_input[0][0] = i_W_cgra;
+        cgra_input[0][0] = (int32_t)i_W_cgra;
         cgra_input[2][0] = 0x5a827999L;
         cgra_input[2][1] = N_ITERS;
 
@@ -341,8 +341,8 @@
         .col_n  = CGRA_N_COLS,
         .in_n   = IN_VAR_DEPTH,
         .out_n  = OUT_VAR_DEPTH,
-        .input  = cgra_input,
-        .output = cgra_output,
+        .input  = KCOM_IO_PTR(cgra_input),
+        .output = KCOM_IO_PTR(cgra_output),
         .config = config,
         .func   = software,
         .check  = check,
@@ -362,7 +362,7 @@
             i_W_soft[i] = kcom_getRand() % (UINT_MAX - 1 - 0 + 1) + 0;
             i_W_cgra[i] = i_W_soft[i];
         }
-        cgra_input[0][0] = i_W_cgra;
+        cgra_input[0][0] = (int32_t)i_W_cgra;
         cgra_input[1][0] = 1518500249;
 
     }

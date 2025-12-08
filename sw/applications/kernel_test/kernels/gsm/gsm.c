@@ -91,8 +91,8 @@ extern kcom_kernel_t gsm_kernel = {
     .col_n  = CGRA_COLS,
     .in_n   = IN_VAR_DEPTH,
     .out_n  = OUT_VAR_DEPTH,
-    .input  = cgra_input,
-    .output = cgra_output,
+    .input  = KCOM_IO_PTR(cgra_input),
+    .output = KCOM_IO_PTR(cgra_output),
     .config = config,
     .func   = software,
     .check  = check,
@@ -113,7 +113,7 @@ void config()
         i_d_cgra[i] = i_d_soft[i];
     }
 
-	cgra_input[0][0] = i_d_cgra;
+	cgra_input[0][0] = (int32_t)i_d_cgra;
 	cgra_input[0][1] = -32768;
 	cgra_input[0][2] = 39;
 	cgra_input[1][0] = 32767;
@@ -212,8 +212,8 @@ uint32_t check(void)
             .col_n  = CGRA_COLS,
             .in_n   = IN_VAR_DEPTH,
             .out_n  = OUT_VAR_DEPTH,
-            .input  = cgra_input,
-            .output = cgra_output,
+            .input  = KCOM_IO_PTR(cgra_input),
+            .output = KCOM_IO_PTR(cgra_output),
             .config = config,
             .func   = software,
             .check  = check,
@@ -236,7 +236,7 @@ uint32_t check(void)
             cgra_input[1][0] = 39;
             cgra_input[2][0] = -32768;
             cgra_input[2][1] = 32767;
-            cgra_input[2][2] = i_d_cgra;
+            cgra_input[2][2] = (int32_t)i_d_cgra;
 
         }
 
@@ -340,8 +340,8 @@ uint32_t check(void)
         .col_n  = CGRA_COLS,
         .in_n   = 2,
         .out_n  = 1,
-        .input  = cgra_input,
-        .output = cgra_output,
+        .input  = KCOM_IO_PTR(cgra_input),
+        .output = KCOM_IO_PTR(cgra_output),
         .config = config,
         .func   = software,
         .check  = check,
@@ -361,7 +361,7 @@ uint32_t check(void)
             i_x_soft[i] = kcom_getRand() %(32767 - -32768 + 1) + -32768;
             i_x_cgra[i] = i_x_soft[i];
         }
-        cgra_input[1][0] = i_x_cgra;
+        cgra_input[1][0] = (int32_t)i_x_cgra;
         cgra_input[3][0] = 32767;
         cgra_input[3][1] = -32768;
 
