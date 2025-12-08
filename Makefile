@@ -21,6 +21,9 @@ PROJECT ?= hello_world
 export HEEP_DIR = hw/vendor/esl_epfl_x_heep/
 include $(HEEP_DIR)Makefile.venv
 
+# FUSESOC and Python values (using venv)
+FUSESOC = $(PWD)/$(VENV)/fusesoc
+
 HEEPSILON_CFG  ?= heepsilon_cfg.hjson
 
 heepsilon-gen:
@@ -43,7 +46,7 @@ mcu-gen: heepsilon-gen
 ## @param FPGA_BOARD=nexys-a7-100t,pynq-z2
 ## @param FUSESOC_FLAGS=--flag=<flagname>
 vivado-fpga: |venv
-	fusesoc --cores-root . run --no-export --target=$(FPGA_BOARD) $(FUSESOC_FLAGS) --setup --build eslepfl:systems:heepsilon 2>&1 | tee buildvivado.log
+	$(FUSESOC) --cores-root . run --no-export --target=$(FPGA_BOARD) $(FUSESOC_FLAGS) --setup --build eslepfl:systems:heepsilon 2>&1 | tee buildvivado.log
 
 
 # Runs verible formating
@@ -52,16 +55,16 @@ verible:
 
 # Simulation
 verilator-sim:
-	fusesoc --cores-root . run --no-export --target=sim --tool=verilator $(FUSESOC_FLAGS) --setup --build eslepfl:systems:heepsilon 2>&1 | tee buildsim.log
+	$(FUSESOC) --cores-root . run --no-export --target=sim --tool=verilator $(FUSESOC_FLAGS) --setup --build eslepfl:systems:heepsilon 2>&1 | tee buildsim.log
 
 questasim-sim:
-	fusesoc --cores-root . run --no-export --target=sim --tool=modelsim $(FUSESOC_FLAGS) --setup --build eslepfl:systems:heepsilon 2>&1 | tee buildsim.log
+	$(FUSESOC) --cores-root . run --no-export --target=sim --tool=modelsim $(FUSESOC_FLAGS) --setup --build eslepfl:systems:heepsilon 2>&1 | tee buildsim.log
 
 questasim-sim-opt: questasim-sim
 	$(MAKE) -C build/eslepfl_systems_heepsilon_0/sim-modelsim opt
 
 vcs-sim:
-	fusesoc --cores-root . run --no-export --target=sim --tool=vcs $(FUSESOC_FLAGS) --setup --build eslepfl:systems:heepsilon 2>&1 | tee buildsim.log
+	$(FUSESOC) --cores-root . run --no-export --target=sim --tool=vcs $(FUSESOC_FLAGS) --setup --build eslepfl:systems:heepsilon 2>&1 | tee buildsim.log
 
 
 ## Generates the build output for a given application
