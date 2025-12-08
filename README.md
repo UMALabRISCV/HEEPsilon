@@ -11,14 +11,117 @@ In addition to all the tools available for X-HEEP, HEEPsilon is building a toolc
 
 ---
 
+> [!NOTE]
+> **Fork Information**: This repository is a fork maintained by the [University of Málaga (UMA)](https://www.uma.es/) - Departamento de Arquitectura de Computadores (DAC). It includes bug fixes and updates for compatibility with **X-HEEP v1.0.4**.
+
+## Version Compatibility
+
+| Component | Version | Notes |
+|-----------|---------|-------|
+| X-HEEP | v1.0.4 | Vendorized in `hw/vendor/esl_epfl_x_heep` |
+| OpenEdgeCGRA | 4a179fc | Vendorized in `hw/vendor/esl_epfl_cgra` |
+| Verilator | 5.x | Tested with v5.040 |
+
+---
+
 # Getting started
 
-Due to its modular design, HEEPsilon respects the X-HEEP workflow. As such, you can follow [X-HEEP's getting started](https://x-heep.readthedocs.io/en/latest/How_to/GettingStarted.html) to set up the environment... HOWEVER...
+## Prerequisites
 
-Althought the HEEPsilon team will try to keep the latest version of X-HEEP available, changes in the X-HEEP setup might not reflect immediately on this repository.
+1. **RISC-V Toolchain**: Install `riscv32-corev-elf-*` toolchain
+2. **Python 3.8+**: With pip and venv support
+3. **Verilator 5.x**: For RTL simulation
+4. **FuseSoC**: Installed via pip
 
-👉 For the most accurate set-up instructions please refer to the documentation of the [vendorized X-HEEP](https://github.com/esl-epfl/heepsilon/tree/main/hw/vendor/esl_epfl_x_heep).
+## Quick Setup
 
+```bash
+# Clone the repository
+git clone https://github.com/UMALabRISCV/HEEPsilon.git
+cd HEEPsilon
+
+# Create and activate Python virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Install Python dependencies
+pip install -r hw/vendor/esl_epfl_x_heep/python-requirements.txt
+
+# Generate MCU configuration (256KB memory, 8 banks)
+make mcu-gen CPU=cv32e20 BUS=NtoM MEMORY_BANKS=8
+```
+
+## Building and Running Simulations
+
+### 1. Build Verilator Simulation Model
+
+```bash
+source .venv/bin/activate
+make verilator-sim
+```
+
+### 2. Compile an Application
+
+```bash
+# Clean previous build and compile
+make clean-app
+make app PROJECT=<project_name> TARGET=sim
+```
+
+Available test applications:
+- `hello_world` - Basic UART test
+- `cgra_func_test` - CGRA functionality verification
+
+### 3. Run Simulation
+
+```bash
+cd build/eslepfl_systems_heepsilon_0/sim-verilator
+./Vtestharness +firmware=../../../sw/build/main.hex
+```
+
+UART output is saved to `uart0.log`.
+
+### Complete Example (CGRA Test)
+
+```bash
+source .venv/bin/activate
+make mcu-gen CPU=cv32e20 BUS=NtoM MEMORY_BANKS=8
+make verilator-sim
+make clean-app && make app PROJECT=cgra_func_test TARGET=sim
+cd build/eslepfl_systems_heepsilon_0/sim-verilator
+./Vtestharness +firmware=../../../sw/build/main.hex
+cat uart0.log
+# Expected: "CGRA functionality check finished with 0 errors"
+```
+
+---
+
+# Technical Changes (UMA-DAC Fork)
+
+This fork includes the following fixes for X-HEEP v1.0.4 compatibility:
+
+### 1. Custom External Crossbar (`hw/rtl/ext_xbar.sv`)
+
+The original X-HEEP testbench `ext_xbar.sv` contains NAPOT (Next Address Power Of Two) logic designed for interleaved slow memory access. This logic assumes slave index 0 is always `SLOW_MEMORY`, but in HEEPsilon, index 0 is the **CGRA context memory**.
+
+**Problem**: When the CPU accessed CGRA memory at `0xF0000000`, the NAPOT logic incorrectly modified addresses, causing bus hangs.
+
+**Solution**: Created a HEEPsilon-specific `ext_xbar.sv` that removes the NAPOT logic while maintaining full crossbar functionality.
+
+### 2. Testharness Refactoring (`tb/testharness.sv`)
+
+Ported the X-HEEP v1.0.4 testharness architecture:
+- Updated powergate signal handling for `cpu_subsystem` and `peripheral_subsystem`
+- Added DPI components for UART, JTAG, and SPI Flash
+- Proper power switch emulation matching X-HEEP patterns
+
+### 3. FuseSoC Configuration Updates
+
+- Added SPI Flash model (`spiflash.core`) for Verilator
+- Updated Verilator waivers for vendor code compatibility
+- Configured `heepsilon.core` to use local `ext_xbar.sv`
+
+---
 
 # Behavioural simulations
 
@@ -49,5 +152,8 @@ Pending work includes:
 
 # Contact us
 
-Have some questions? Don't hesitate to contact us: juan.sapriza@epfl.ch
+**Original Project (EPFL):**
+Have some questions? Don't hesitate to contact: juan.sapriza@epfl.ch
 
+**UMA-DAC Fork:**
+Maintainer: Cristian Campos - cricamfe@ac.uma.es
