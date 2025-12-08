@@ -21,8 +21,16 @@ PROJECT ?= hello_world
 export HEEP_DIR = hw/vendor/esl_epfl_x_heep/
 include $(HEEP_DIR)Makefile.venv
 
-# FUSESOC and Python values (using venv)
+# FUSESOC and Python values - support both venv and conda
+ifndef CONDA_DEFAULT_ENV
+$(info USING VENV)
 FUSESOC = $(PWD)/$(VENV)/fusesoc
+PYTHON  = $(PWD)/$(VENV)/python
+else
+$(info USING MINICONDA $(CONDA_DEFAULT_ENV))
+FUSESOC := $(shell which fusesoc)
+PYTHON  := $(shell which python)
+endif
 
 HEEPSILON_CFG  ?= heepsilon_cfg.hjson
 
