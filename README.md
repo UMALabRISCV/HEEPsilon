@@ -53,30 +53,37 @@ make mcu-gen CPU=cv32e20 BUS=NtoM MEMORY_BANKS=8
 
 ## Building and Running Simulations
 
+These commands follow the [X-HEEP simulation workflow](hw/vendor/esl_epfl_x_heep/docs/source/How_to/Simulate.md).
+
 ### 1. Build Verilator Simulation Model
 
 ```bash
 source .venv/bin/activate
-make verilator-sim
+make verilator-build
 ```
 
-### 2. Compile an Application
+### 2. Compile and Run an Application
 
+**Option A: Step by step**
 ```bash
-# Clean previous build and compile
-make clean-app
-make app PROJECT=<project_name> TARGET=sim
+make app PROJECT=hello_world TARGET=sim
+make verilator-run
+```
+
+**Option B: All in one** (recommended)
+```bash
+make verilator-run-app PROJECT=cgra_func_test
 ```
 
 Available test applications:
 - `hello_world` - Basic UART test
 - `cgra_func_test` - CGRA functionality verification
 
-### 3. Run Simulation
+### 3. Simulation Parameters
 
+You can pass additional parameters via `SIM_ARGS`:
 ```bash
-cd build/eslepfl_systems_heepsilon_0/sim-verilator
-./Vtestharness +firmware=../../../sw/build/main.hex
+make verilator-run SIM_ARGS="+max_sim_time=100000"
 ```
 
 UART output is saved to `uart0.log`.
@@ -86,11 +93,8 @@ UART output is saved to `uart0.log`.
 ```bash
 source .venv/bin/activate
 make mcu-gen CPU=cv32e20 BUS=NtoM MEMORY_BANKS=8
-make verilator-sim
-make clean-app && make app PROJECT=cgra_func_test TARGET=sim
-cd build/eslepfl_systems_heepsilon_0/sim-verilator
-./Vtestharness +firmware=../../../sw/build/main.hex
-cat uart0.log
+make verilator-build
+make verilator-run-app PROJECT=cgra_func_test
 # Expected: "CGRA functionality check finished with 0 errors"
 ```
 
