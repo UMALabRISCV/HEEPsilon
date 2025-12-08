@@ -67,12 +67,13 @@ module heepsilon_top #(
   obi_resp_t heep_core_data_resp;
   obi_req_t heep_debug_master_req;
   obi_resp_t heep_debug_master_resp;
-  obi_req_t heep_dma_read_ch0_req;
-  obi_resp_t heep_dma_read_ch0_resp;
-  obi_req_t heep_dma_write_ch0_req;
-  obi_resp_t heep_dma_write_ch0_resp;
-  obi_req_t heep_dma_addr_ch0_req;
-  obi_resp_t heep_dma_addr_ch0_resp;
+  // Multi-port DMA signals for x-heep v1.0.4
+  obi_req_t  [core_v_mini_mcu_pkg::DMA_NUM_MASTER_PORTS-1:0] heep_dma_read_req;
+  obi_resp_t [core_v_mini_mcu_pkg::DMA_NUM_MASTER_PORTS-1:0] heep_dma_read_resp;
+  obi_req_t  [core_v_mini_mcu_pkg::DMA_NUM_MASTER_PORTS-1:0] heep_dma_write_req;
+  obi_resp_t [core_v_mini_mcu_pkg::DMA_NUM_MASTER_PORTS-1:0] heep_dma_write_resp;
+  obi_req_t  [core_v_mini_mcu_pkg::DMA_NUM_MASTER_PORTS-1:0] heep_dma_addr_req;
+  obi_resp_t [core_v_mini_mcu_pkg::DMA_NUM_MASTER_PORTS-1:0] heep_dma_addr_resp;
 
 
 
@@ -109,16 +110,19 @@ module heepsilon_top #(
   assign cgra_logic_rst_n               = external_subsystem_rst_n;
   assign cgra_ram_banks_set_retentive_n = external_ram_banks_set_retentive_n;
 
-  // Tie off powergate ack signals (always acknowledge power gate requests)
+  // Tie off powergate ack signals for synthesis (simulation uses testharness control)
+`ifdef SYNTHESIS
   assign cpu_subsystem_powergate_switch_ack_n = cpu_subsystem_powergate_switch_n;
   assign peripheral_subsystem_powergate_switch_ack_n = peripheral_subsystem_powergate_switch_n;
+`endif
 
-  // HW FIFO responses (unused - all zeros)
+  // HW FIFO responses (unused - FIFO appears empty/not full)
   always_comb begin
     for (int i = 0; i < core_v_mini_mcu_pkg::DMA_CH_NUM; i++) begin
-      hw_fifo_resp[i].ready = 1'b0;
-      hw_fifo_resp[i].rdata = '0;
-      hw_fifo_resp[i].err   = 1'b0;
+      hw_fifo_resp[i].empty    = 1'b1;  // FIFO empty
+      hw_fifo_resp[i].full     = 1'b0;  // FIFO not full
+      hw_fifo_resp[i].alm_full = 1'b0;  // FIFO not almost full
+      hw_fifo_resp[i].data     = '0;    // No data
     end
   end
 
@@ -151,12 +155,12 @@ module heepsilon_top #(
       .heep_core_data_resp_o    (heep_core_data_resp),
       .heep_debug_master_req_i  (heep_debug_master_req),
       .heep_debug_master_resp_o (heep_debug_master_resp),
-      .heep_dma_read_req_i  (heep_dma_read_ch0_req),
-      .heep_dma_read_resp_o (heep_dma_read_ch0_resp),
-      .heep_dma_write_req_i (heep_dma_write_ch0_req),
-      .heep_dma_write_resp_o(heep_dma_write_ch0_resp),
-      .heep_dma_addr_req_i  (heep_dma_addr_ch0_req),
-      .heep_dma_addr_resp_o (heep_dma_addr_ch0_resp),
+      .heep_dma_read_req_i  (heep_dma_read_req),
+      .heep_dma_read_resp_o (heep_dma_read_resp),
+      .heep_dma_write_req_i (heep_dma_write_req),
+      .heep_dma_write_resp_o(heep_dma_write_resp),
+      .heep_dma_addr_req_i  (heep_dma_addr_req),
+      .heep_dma_addr_resp_o (heep_dma_addr_resp),
 
       .ext_master_req_i (ext_master_req),
       .ext_master_resp_o(ext_master_resp),
@@ -271,12 +275,12 @@ module heepsilon_top #(
       .ext_core_data_resp_i(heep_core_data_resp),
       .ext_debug_master_req_o(heep_debug_master_req),
       .ext_debug_master_resp_i(heep_debug_master_resp),
-      .ext_dma_read_req_o(heep_dma_read_ch0_req),
-      .ext_dma_read_resp_i(heep_dma_read_ch0_resp),
-      .ext_dma_write_req_o(heep_dma_write_ch0_req),
-      .ext_dma_write_resp_i(heep_dma_write_ch0_resp),
-      .ext_dma_addr_req_o(heep_dma_addr_ch0_req),
-      .ext_dma_addr_resp_i(heep_dma_addr_ch0_resp),
+      .ext_dma_read_req_o(heep_dma_read_req),
+      .ext_dma_read_resp_i(heep_dma_read_resp),
+      .ext_dma_write_req_o(heep_dma_write_req),
+      .ext_dma_write_resp_i(heep_dma_write_resp),
+      .ext_dma_addr_req_o(heep_dma_addr_req),
+      .ext_dma_addr_resp_i(heep_dma_addr_resp),
       // HW FIFO interface (new in x-heep v1.0.4)
       .hw_fifo_req_o(hw_fifo_req),
       .hw_fifo_resp_i(hw_fifo_resp),
