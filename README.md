@@ -51,6 +51,30 @@ pip install -r hw/vendor/esl_epfl_x_heep/python-requirements.txt
 make mcu-gen CPU=cv32e20 BUS=NtoM MEMORY_BANKS=8
 ```
 
+## Docker Quick Start (Recommended)
+
+A pre-configured Docker environment with all dependencies is available:
+
+```bash
+# Clone the repository
+git clone --recursive https://github.com/UMALabRISCV/HEEPsilon.git
+cd HEEPsilon
+
+# Build the Docker image (first time only)
+make -C util/docker docker-build
+
+# Start the container
+make -C util/docker docker-run
+```
+
+Inside the container, all tools are ready:
+```bash
+make mcu-gen && make verilator-sim   # First time setup
+make verilator-run-app PROJECT=hello_world
+```
+
+See [`util/docker/README.md`](util/docker/README.md) for more details.
+
 ## Building and Running Simulations
 
 These commands follow the [X-HEEP simulation workflow](hw/vendor/esl_epfl_x_heep/docs/source/How_to/Simulate.md).
