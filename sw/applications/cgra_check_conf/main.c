@@ -118,7 +118,7 @@ int main(void) {
   // |    |    |    |    | 
   // 5 -- 6 -- 7 -- 8 -- 9
   //
-  int32_t* ptr_stimuli = stimuli;
+  int32_t* ptr_stimuli = (int32_t*)stimuli;
   for (int i=0; i<CGRA_MAX_COLS*CGRA_N_ROWS; i++) {
     *ptr_stimuli++ = i;
   }
