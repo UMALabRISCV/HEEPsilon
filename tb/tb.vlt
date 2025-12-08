@@ -17,4 +17,15 @@ lint_off -rule UNUSEDSIGNAL -file "*ao_peripheral_subsystem.sv" -match "*spc2ao_
 lint_off -rule NOLATCH -file "*cve2_clock_gate.sv" -match "*"
 
 // Testbench multidriven waivers (expected behavior for simulation)
+// testharness.sv overrides memory_subsystem powergate ack via force for VCS
+// cpu and peripheral acks are now proper input ports - no waiver needed
 lint_off -rule MULTIDRIVEN -file "*core_v_mini_mcu.sv" -match "*memory_subsystem_banks_powergate_switch_ack_n*"
+
+// SPI Flash model waivers (vendor code from yosys - cannot modify)
+lint_off -rule BLKSEQ -file "*yosys_spiflash.sv" -match "*"
+lint_off -rule PROCASSINIT -file "*yosys_spiflash.sv" -match "*"
+lint_off -rule CASEINCOMPLETE -file "*yosys_spiflash.sv" -match "*"
+lint_off -rule LATCH -file "*yosys_spiflash.sv" -match "*"
+lint_off -rule UNUSED -file "*yosys_spiflash.sv" -match "*"
+lint_off -rule WIDTHTRUNC -file "*yosys_spiflash.sv" -match "*"
+lint_off -rule DECLFILENAME -file "*yosys_spiflash.sv" -match "*"

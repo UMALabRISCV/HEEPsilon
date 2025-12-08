@@ -44,7 +44,14 @@ module heepsilon_top #(
     inout logic       spi2_sck_o,
 
     inout logic i2c_scl_io,
-    inout logic i2c_sda_io
+    inout logic i2c_sda_io,
+
+    // Powergate ack inputs (from testharness during simulation, directly connected in synthesis wrapper)
+    input logic cpu_subsystem_powergate_switch_ack_ni,
+    input logic peripheral_subsystem_powergate_switch_ack_ni,
+    // Powergate switch outputs (for testharness to generate delayed ack feedback)
+    output logic cpu_subsystem_powergate_switch_no,
+    output logic peripheral_subsystem_powergate_switch_no
 );
 
   import obi_pkg::*;
@@ -94,11 +101,9 @@ module heepsilon_top #(
   logic external_subsystem_powergate_switch_ack_n;
   logic external_subsystem_powergate_iso_n;
 
-  // New signals for x-heep v1.0.4
+  // New signals for x-heep v1.0.4 (outputs from x_heep_system)
   logic cpu_subsystem_powergate_switch_n;
-  logic cpu_subsystem_powergate_switch_ack_n;
   logic peripheral_subsystem_powergate_switch_n;
-  logic peripheral_subsystem_powergate_switch_ack_n;
   /* verilator lint_on unused */
 
   // HW FIFO signals (unused in HEEPsilon - no HW FIFO implementation)
@@ -112,11 +117,14 @@ module heepsilon_top #(
   assign cgra_logic_rst_n               = external_subsystem_rst_n;
   assign cgra_ram_banks_set_retentive_n = external_ram_banks_set_retentive_n;
 
-  // Tie off powergate ack signals for synthesis (simulation uses testharness control)
-`ifdef SYNTHESIS
-  assign cpu_subsystem_powergate_switch_ack_n = cpu_subsystem_powergate_switch_n;
-  assign peripheral_subsystem_powergate_switch_ack_n = peripheral_subsystem_powergate_switch_n;
-`endif
+  // Powergate ack signals are now input ports - controlled by testharness (simulation)
+  // or tied off by synthesis wrapper (synthesis)
+  // External subsystem ack uses immediate feedback (CGRA is always-on in HEEPsilon)
+  assign external_subsystem_powergate_switch_ack_n = external_subsystem_powergate_switch_n;
+
+  // Connect internal powergate switch signals to output ports for testharness access
+  assign cpu_subsystem_powergate_switch_no = cpu_subsystem_powergate_switch_n;
+  assign peripheral_subsystem_powergate_switch_no = peripheral_subsystem_powergate_switch_n;
 
   // HW FIFO responses (unused - FIFO appears empty/not full)
   always_comb begin
@@ -289,9 +297,9 @@ module heepsilon_top #(
       .hw_fifo_done_i('0),
       // Powergate signals (new in x-heep v1.0.4)
       .cpu_subsystem_powergate_switch_no(cpu_subsystem_powergate_switch_n),
-      .cpu_subsystem_powergate_switch_ack_ni(cpu_subsystem_powergate_switch_ack_n),
+      .cpu_subsystem_powergate_switch_ack_ni(cpu_subsystem_powergate_switch_ack_ni),
       .peripheral_subsystem_powergate_switch_no(peripheral_subsystem_powergate_switch_n),
-      .peripheral_subsystem_powergate_switch_ack_ni(peripheral_subsystem_powergate_switch_ack_n),
+      .peripheral_subsystem_powergate_switch_ack_ni(peripheral_subsystem_powergate_switch_ack_ni),
       .external_subsystem_clkgate_en_no(external_subsystem_clkgate_en_n),
       .ext_peripheral_slave_req_o(ext_periph_slave_req),
       .ext_peripheral_slave_resp_i(ext_periph_slave_resp),
