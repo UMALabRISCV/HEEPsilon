@@ -26,32 +26,12 @@ In addition to all the tools available for X-HEEP, HEEPsilon is building a toolc
 
 # Getting started
 
-## Prerequisites
+There are three ways to set up HEEPsilon:
+1. **Docker** (Recommended) - Pre-configured environment, works immediately
+2. **Automatic Setup Script** - Installs all dependencies on your system
+3. **Manual Setup** - Follow X-HEEP documentation
 
-1. **RISC-V Toolchain**: Install `riscv32-corev-elf-*` toolchain
-2. **Python 3.8+**: With pip and venv support
-3. **Verilator 5.x**: For RTL simulation
-4. **FuseSoC**: Installed via pip
-
-## Quick Setup
-
-```bash
-# Clone the repository
-git clone https://github.com/UMALabRISCV/HEEPsilon.git
-cd HEEPsilon
-
-# Create and activate Python virtual environment
-python3 -m venv .venv
-source .venv/bin/activate
-
-# Install Python dependencies
-pip install -r hw/vendor/esl_epfl_x_heep/python-requirements.txt
-
-# Generate MCU configuration (256KB memory, 8 banks)
-make mcu-gen CPU=cv32e20 BUS=NtoM MEMORY_BANKS=8
-```
-
-## Docker Quick Start (Recommended)
+## Option 1: Docker (Recommended)
 
 A pre-configured Docker environment with all dependencies is available:
 
@@ -60,7 +40,7 @@ A pre-configured Docker environment with all dependencies is available:
 git clone --recursive https://github.com/UMALabRISCV/HEEPsilon.git
 cd HEEPsilon
 
-# Build the Docker image (first time only)
+# Build the Docker image (first time only, ~5 min)
 make -C util/docker docker-build
 
 # Start the container
@@ -74,6 +54,41 @@ make verilator-run-app PROJECT=hello_world
 ```
 
 See [`util/docker/README.md`](util/docker/README.md) for more details.
+
+## Option 2: Automatic Setup Script
+
+If you prefer to install dependencies directly on your system (Ubuntu/Debian):
+
+```bash
+# Clone the repository
+git clone --recursive https://github.com/UMALabRISCV/HEEPsilon.git
+cd HEEPsilon
+
+# Run the setup script (installs everything)
+./scripts/setup.sh
+```
+
+The script installs:
+- System dependencies (build tools, libraries)
+- Verilator 5.040
+- Verible (SystemVerilog formatter)
+- RISC-V CORE-V GCC toolchain
+- Python virtual environment with all dependencies
+
+You can also install components individually:
+```bash
+./scripts/setup.sh --deps       # System dependencies only
+./scripts/setup.sh --verilator  # Verilator only
+./scripts/setup.sh --toolchain  # RISC-V toolchain only
+./scripts/setup.sh --python     # Python environment only
+./scripts/setup.sh --help       # Show all options
+```
+
+After installation, add the tools to your PATH (the script will show the exact commands).
+
+## Option 3: Manual Setup
+
+Follow the [X-HEEP Setup Documentation](hw/vendor/esl_epfl_x_heep/docs/source/GettingStarted/Setup.md) for detailed manual installation instructions.
 
 ## Building and Running Simulations
 
