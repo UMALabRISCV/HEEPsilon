@@ -61,29 +61,29 @@ module ext_xbar #(
   localparam int unsigned RESP_AGG_DATA_WIDTH = 32;
 
   // Address Decoder outputs
+  /* verilator lint_off UNUSEDSIGNAL */
   logic [XBAR_NMASTER-1:0][LOG_XBAR_NSLAVE-1:0] port_sel;
 
   // Neck crossbar signals (only used in 1toM mode)
-  /* verilator lint_off UNUSEDSIGNAL */
   obi_req_t neck_req;
   obi_resp_t neck_resp;
-  /* verilator lint_on UNUSEDSIGNAL */
 
-  // Master request/response signals
+  // Master request/response signals (only used in NtoM mode)
   logic [XBAR_NMASTER-1:0] master_req_req;
   logic [XBAR_NMASTER-1:0] master_resp_gnt;
   logic [XBAR_NMASTER-1:0] master_resp_rvalid;
   logic [XBAR_NMASTER-1:0][31:0] master_resp_rdata;
 
-  // Slave request/response signals
+  // Slave request/response signals (only used in NtoM mode)
   logic [XBAR_NSLAVE-1:0] slave_req_req;
   logic [XBAR_NSLAVE-1:0] slave_resp_gnt;
   logic [XBAR_NSLAVE-1:0] slave_resp_rvalid;
   logic [XBAR_NSLAVE-1:0][31:0] slave_resp_rdata;
 
-  // Aggregated data buses
+  // Aggregated data buses (only used in NtoM mode)
   logic [XBAR_NMASTER-1:0][REQ_AGG_DATA_WIDTH-1:0] master_req_out_data;
   logic [XBAR_NSLAVE-1:0][REQ_AGG_DATA_WIDTH-1:0] slave_req_out_data;
+  /* verilator lint_on UNUSEDSIGNAL */
 
   generate
     if (BUS_TYPE == NtoM) begin : gen_xbar_NtoM
