@@ -152,7 +152,7 @@ install_system_deps_macos() {
     brew install \
         autoconf automake libtool python@3 gmp mpfr libmpc \
         bison flex gawk texinfo wget cmake ninja \
-        ccache zlib expat libelf help2man
+        ccache zlib expat libelf help2man coreutils
 
     print_step "Configuring Python..."
     if ! command -v python3 &> /dev/null; then
@@ -345,12 +345,13 @@ print_env_setup() {
     fi
     
     if [ "$OS" == "macos" ]; then
-        # macOS: Verilator is in Homebrew path, need libelf flags for linking
+        # macOS: Verilator is in Homebrew path, need libelf flags and GNU coreutils
         LIBELF_PREFIX=$(brew --prefix libelf)
+        COREUTILS_PREFIX=$(brew --prefix coreutils)
         ENV_CONFIG="
 # HEEPsilon Development Environment (added by setup.sh)
 export RISCV_XHEEP=${RISCV_DIR}
-export PATH=${VERIBLE_DIR}/bin:\${RISCV_XHEEP}/bin:\$PATH
+export PATH=${COREUTILS_PREFIX}/libexec/gnubin:${VERIBLE_DIR}/bin:\${RISCV_XHEEP}/bin:\$PATH
 
 # libelf for Verilator simulation linking
 export LDFLAGS=\"-L${LIBELF_PREFIX}/lib \$LDFLAGS\"
