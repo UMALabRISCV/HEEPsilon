@@ -111,6 +111,8 @@ vcs-build: |venv
 	$(FUSESOC) --cores-root . run --no-export --target=sim --tool=vcs $(FUSESOC_FLAGS) --setup --build eslepfl:systems:heepsilon $(FUSESOC_PARAM) 2>&1 | tee buildsim.log
 
 # Legacy aliases (for backwards compatibility with old HEEPsilon targets)
+# Note: .PHONY prevents external.mk wildcard from passing these to x-heep
+.PHONY: verilator-sim questasim-sim questasim-sim-opt vcs-sim
 verilator-sim: verilator-build
 questasim-sim: questasim-build
 questasim-sim-opt: questasim-build-opt
