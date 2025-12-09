@@ -1,0 +1,7 @@
+[submodule "sw/applications/trans_versasense/SYLT-FFT"]
+	path = sw/applications/trans_versasense/SYLT-FFT
+	url = https://github.com/sylt-collab/SYLT-FFT.git
+
+[submodule "sw/applications/transformer_without_cgra/SYLT-FFT"]
+	path = sw/applications/transformer_without_cgra/SYLT-FFT
+	url = https://github.com/sylt-collab/SYLT-FFT.git
