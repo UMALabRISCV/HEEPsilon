@@ -1,18 +1,35 @@
-<p align="left"><img src="docs/HEEPsilon_logo.png" width="500"></p>
+<p align="center"><img src="docs/HEEPsilon_logo.png" width="500"></p>
 
-HEEPsilon is a versatile computing platform targeting ultra low power processing of biological and environmental signals. It is built over the [X-HEEP](https://github.com/esl-epfl/x-heep) platform and extends it with [openEdgeCGRA](https://github.com/esl-epfl/OpenEdgeCGRA) a design-time resizable and run-time reprogrammable Coarse Grained Reconfigurable Array (CGRA).
-For a brief insight on HEEPsilon please refer to our abstract:
+<p align="center">
+  <strong>Ultra Low Power Computing Platform with CGRA Acceleration</strong>
+</p>
 
-📄 [An Open-Hardware Coarse-Grained Reconfigurable Array for Edge Computing](https://dl.acm.org/doi/10.1145/3587135.3591437).
-
-As an X-HEEP spinoff, HEEPsilon keeps all X-HEEP functionalities, from RTL simulation on Verilator, VCS and Questasim to implementation on the [PYNQ-Z2 FPGA](https://www.xilinx.com/support/university/xup-boards/XUPPYNQ-Z2.html). Our cousin HEEPocrates was recently taped-out in TSMC 65nm process and is currently undertaking tests successfully.
-
-In addition to all the tools available for X-HEEP, HEEPsilon is building a toolchain to simplify the C-code→CGRA process.
+<p align="center">
+  <a href="#getting-started">Getting Started</a> •
+  <a href="#documentation">Documentation</a> •
+  <a href="#contributing">Contributing</a> •
+  <a href="#contact">Contact</a>
+</p>
 
 ---
 
+## Overview
+
+**HEEPsilon** is a versatile computing platform targeting ultra-low-power processing of biological and environmental signals. Built on top of [X-HEEP](https://github.com/esl-epfl/x-heep), it extends the platform with [OpenEdgeCGRA](https://github.com/esl-epfl/OpenEdgeCGRA) — a design-time resizable and run-time reprogrammable **Coarse Grained Reconfigurable Array (CGRA)**.
+
+📄 **Publication**: [An Open-Hardware Coarse-Grained Reconfigurable Array for Edge Computing](https://dl.acm.org/doi/10.1145/3587135.3591437)
+
+### Key Features
+
+- **X-HEEP Compatible**: All X-HEEP functionalities including RTL simulation (Verilator, VCS, Questasim) and FPGA implementation
+- **CGRA Acceleration**: Programmable hardware acceleration for compute-intensive tasks
+- **Silicon-Proven**: Our cousin HEEPocrates was taped-out in TSMC 65nm and is running successfully
+- **FPGA Ready**: Supports [PYNQ-Z2](https://www.xilinx.com/support/university/xup-boards/XUPPYNQ-Z2.html) out of the box
+
 > [!NOTE]
-> **Fork Information**: This repository is a fork maintained by the [University of Málaga (UMA)](https://www.uma.es/) - Departamento de Arquitectura de Computadores (DAC). It includes bug fixes and updates for compatibility with **X-HEEP v1.0.4**.
+> **Fork Information**: This repository is maintained by the [University of Málaga (UMA)](https://www.uma.es/) - Departamento de Arquitectura de Computadores. It includes bug fixes and updates for **X-HEEP v1.0.4** compatibility.
+
+---
 
 ## Version Compatibility
 
@@ -24,58 +41,61 @@ In addition to all the tools available for X-HEEP, HEEPsilon is building a toolc
 
 ---
 
-# Getting started
+## Getting Started
 
-There are three ways to set up HEEPsilon:
-1. **Docker** (Recommended) - Pre-configured environment, works immediately
-2. **Automatic Setup Script** - Installs all dependencies on your system
-3. **Manual Setup** - Follow X-HEEP documentation
+Choose one of three setup methods:
 
-## Option 1: Docker (Recommended)
+| Method | Best For | Time |
+|--------|----------|------|
+| 🐳 **Docker** | Quick start, CI/CD, reproducibility | ~5 min |
+| 📜 **Setup Script** | Native development on Ubuntu/Debian | ~20 min |
+| 📖 **Manual** | Custom environments, other distros | Varies |
 
-A pre-configured Docker environment with all dependencies is available:
+### Option 1: Docker (Recommended)
+
+The fastest way to get started with a pre-configured environment:
 
 ```bash
 # Clone the repository
 git clone --recursive https://github.com/UMALabRISCV/HEEPsilon.git
 cd HEEPsilon
 
-# Build the Docker image (first time only, ~5 min)
-make -C util/docker docker-build
-
-# Start the container
+# Build and run the container
+make -C util/docker docker-build   # First time only (~5 min)
 make -C util/docker docker-run
 ```
 
-Inside the container, all tools are ready:
+Inside the container:
 ```bash
-make mcu-gen && make verilator-sim   # First time setup
-make verilator-run-app PROJECT=hello_world
+make mcu-gen && make verilator-sim         # Build simulation model
+make verilator-run-app PROJECT=hello_world  # Run test application
 ```
 
-See [`util/docker/README.md`](util/docker/README.md) for more details.
+> See [`util/docker/README.md`](util/docker/README.md) for advanced Docker usage.
 
-## Option 2: Automatic Setup Script
+---
 
-If you prefer to install dependencies directly on your system (Ubuntu/Debian):
+### Option 2: Automatic Setup Script
+
+For native development on **Ubuntu/Debian** systems:
 
 ```bash
 # Clone the repository
 git clone --recursive https://github.com/UMALabRISCV/HEEPsilon.git
 cd HEEPsilon
 
-# Run the setup script (installs everything)
+# Run the setup script
 ./scripts/setup.sh
 ```
 
-The script installs:
-- System dependencies (build tools, libraries)
-- Verilator 5.040
-- Verible (SystemVerilog formatter)
-- RISC-V CORE-V GCC toolchain
-- Python virtual environment with all dependencies
+The script automatically installs:
+- ✅ System dependencies (build tools, libraries)
+- ✅ Verilator 5.040
+- ✅ Verible (SystemVerilog formatter/linter)
+- ✅ RISC-V CORE-V GCC toolchain
+- ✅ Python virtual environment with all dependencies
 
-You can also install components individually:
+**Selective Installation:**
 ```bash
 ./scripts/setup.sh --deps       # System dependencies only
 ./scripts/setup.sh --verilator  # Verilator only
@@ -84,119 +104,145 @@ You can also install components individually:
 ./scripts/setup.sh --help       # Show all options
 ```
 
-After installation, add the tools to your PATH (the script will show the exact commands).
+---
 
-## Option 3: Manual Setup
+### Option 3: Manual Setup
 
-Follow the [X-HEEP Setup Documentation](hw/vendor/esl_epfl_x_heep/docs/source/GettingStarted/Setup.md) for detailed manual installation instructions.
+For other Linux distributions or custom setups, follow the [X-HEEP Setup Documentation](hw/vendor/esl_epfl_x_heep/docs/source/GettingStarted/Setup.md).
+
+---
 
 ## Building and Running Simulations
 
-These commands follow the [X-HEEP simulation workflow](hw/vendor/esl_epfl_x_heep/docs/source/How_to/Simulate.md).
-
-### 1. Build Verilator Simulation Model
+### Quick Start
 
 ```bash
 source .venv/bin/activate
-make verilator-build
+make mcu-gen                                # Generate MCU configuration
+make verilator-sim                          # Build Verilator model
+make verilator-run-app PROJECT=hello_world  # Compile & run application
 ```
 
-### 2. Compile and Run an Application
+### Step-by-Step Workflow
 
-**Option A: Step by step**
+1. **Generate MCU Configuration**
+   ```bash
+   make mcu-gen CPU=cv32e20 BUS=NtoM MEMORY_BANKS=8
+   ```
+
+2. **Build Simulation Model**
+   ```bash
+   make verilator-sim
+   ```
+
+3. **Compile Application**
+   ```bash
+   make app PROJECT=cgra_func_test TARGET=sim
+   ```
+
+4. **Run Simulation**
+   ```bash
+   make verilator-run
+   ```
+
+### Available Test Applications
+
+| Application | Description |
+|-------------|-------------|
+| `hello_world` | Basic UART output test |
+| `cgra_func_test` | CGRA functionality verification |
+| `kernel_test` | CGRA kernel benchmarking |
+
+### Simulation Parameters
+
 ```bash
-make app PROJECT=hello_world TARGET=sim
-make verilator-run
-```
-
-**Option B: All in one** (recommended)
-```bash
-make verilator-run-app PROJECT=cgra_func_test
-```
-
-Available test applications:
-- `hello_world` - Basic UART test
-- `cgra_func_test` - CGRA functionality verification
-
-### 3. Simulation Parameters
-
-You can pass additional parameters via `SIM_ARGS`:
-```bash
+# Set maximum simulation time
 make verilator-run SIM_ARGS="+max_sim_time=100000"
-```
 
-UART output is saved to `uart0.log`.
-
-### Complete Example (CGRA Test)
-
-```bash
-source .venv/bin/activate
-make mcu-gen CPU=cv32e20 BUS=NtoM MEMORY_BANKS=8
-make verilator-build
-make verilator-run-app PROJECT=cgra_func_test
-# Expected: "CGRA functionality check finished with 0 errors"
+# UART output is saved to uart0.log
+cat uart0.log
 ```
 
 ---
 
-# Technical Changes (UMA-DAC Fork)
+## Documentation
 
-This fork includes the following fixes for X-HEEP v1.0.4 compatibility:
+### CGRA Development Tools
 
-### 1. Custom External Crossbar (`hw/rtl/ext_xbar.sv`)
+| Tool | Description |
+|------|-------------|
+| [ESL-CGRA Simulator](https://github.com/esl-epfl/ESL-CGRA-simulator) | Cycle-accurate CGRA behavioral simulation |
+| [SAT-MapIt](https://github.com/CristianTirelli/SAT-MapIt) | Automatic kernel mapping compiler |
+| [X-HEEP FEMU](https://github.com/simone-machetti/x-heep-femu) | FPGA emulation framework |
 
-The original X-HEEP testbench `ext_xbar.sv` contains NAPOT (Next Address Power Of Two) logic designed for interleaved slow memory access. This logic assumes slave index 0 is always `SLOW_MEMORY`, but in HEEPsilon, index 0 is the **CGRA context memory**.
+### Kernel Development
 
-**Problem**: When the CPU accessed CGRA memory at `0xF0000000`, the NAPOT logic incorrectly modified addresses, causing bus hangs.
-
-**Solution**: Created a HEEPsilon-specific `ext_xbar.sv` that removes the NAPOT logic while maintaining full crossbar functionality.
-
-### 2. Testharness Refactoring (`tb/testharness.sv`)
-
-Ported the X-HEEP v1.0.4 testharness architecture:
-- Updated powergate signal handling for `cpu_subsystem` and `peripheral_subsystem`
-- Added DPI components for UART, JTAG, and SPI Flash
-- Proper power switch emulation matching X-HEEP patterns
-
-### 3. FuseSoC Configuration Updates
-
-- Added SPI Flash model (`spiflash.core`) for Verilator
-- Updated Verilator waivers for vendor code compatibility
-- Configured `heepsilon.core` to use local `ext_xbar.sv`
+1. **Design**: Create your kernel using the ESL-CGRA simulator
+2. **Map**: Use SAT-MapIt for automatic mapping of complex kernels
+3. **Test**: Validate with `kernel_test` application
+4. **Deploy**: Run on FPGA or silicon
 
 ---
 
-# Behavioural simulations
+## Technical Details (UMA-DAC Fork)
 
-The CGRA used in HEEPsilon can be simulated with CGRA-instruction accuracy using the [ESL-CGRA simulator](https://github.com/esl-epfl/ESL-CGRA-simulator).
-This allows for fast and easy-to-debug design of kernels for the CGRA. Once you are happy with your design you can compile the assembly and get the bitstream to load into the CGRA.
+This fork includes fixes for X-HEEP v1.0.4 compatibility:
 
-# SAT-MapIt Compiler
+<details>
+<summary><strong>1. Custom External Crossbar</strong></summary>
 
-Your kernel is too complex to be mapped manually? Try using the [SAT-MapIt mapper and compiler](https://github.com/CristianTirelli/SAT-MapIt). Properly label your C-code and let SAT-MapIt find an efficient mapping you can test in the simulator and deploy in the CGRA.
+**File**: `hw/rtl/ext_xbar.sv`
 
-# Testing a kernel
+The original X-HEEP testbench contains NAPOT logic for interleaved slow memory, assuming slave index 0 is `SLOW_MEMORY`. In HEEPsilon, index 0 is the CGRA context memory.
 
-Once you have tested your setup with the `cgra_func_test` application you can start trying out different kernels. HEEPsilon provides a set of tools to easily go from C-code to CGRA bitstreams. All kernels are converted into a standard C source and header file pair which you can use with the `kernel_test` application to measure the speed-up of your CGRA implementation as well as see stochastical variations.
+**Problem**: CPU access to CGRA memory at `0xF0000000` caused bus hangs due to incorrect address modification.
 
-# Adding a complex environment to your platform
+**Solution**: HEEPsilon-specific `ext_xbar.sv` without NAPOT logic.
+</details>
 
-If you application requires some hardcore input-output management, maybe you want to try out the [X-HEEP FEMU](https://github.com/simone-machetti/x-heep-femu). Connect your PYNQ-Z2 FPGA via SSH and start deploying different hardware versions of X-HEEP or HEEPsilon, test different software applications and interface with the hardware from the comfort of Python scripts or Jupyter notebooks.
+<details>
+<summary><strong>2. Testharness Refactoring</strong></summary>
 
-# Wanna collaborate?
+**File**: `tb/testharness.sv`
 
-HEEPsilon is a newborn project that already brings together dozens of researchers from 4 universities across Switzerland, Spain and Italy. There is plenty of cool work to be done for and with HEEPsilon, join us!
+- Updated powergate signal handling
+- Added DPI components (UART, JTAG, SPI Flash)
+- Proper power switch emulation
+</details>
 
-Pending work includes:
-* Development of new kernels for the CGRA and validation in real applications.
-* Integration of the different compilation tools into a single workflow.
-* Extracting variable information from the LLVM pass during C-code → CGRA assembly process.
-* Characterizing the CGRA hardware for cycle and energy-accurate simulation.
+<details>
+<summary><strong>3. FuseSoC Updates</strong></summary>
 
-# Contact us
+- Added SPI Flash model for Verilator
+- Updated Verilator waivers
+- Configured local `ext_xbar.sv`
+</details>
 
-**Original Project (EPFL):**
-Have some questions? Don't hesitate to contact: juan.sapriza@epfl.ch
+---
 
-**UMA-DAC Fork:**
-Maintainer: Cristian Campos - cricamfe@ac.uma.es
+## Contributing
+
+HEEPsilon brings together researchers from universities across Switzerland, Spain, and Italy. We welcome contributions!
+
+### Areas of Interest
+
+- 🔧 New CGRA kernels and validation
+- 🔗 Unified compilation toolchain
+- 📊 Cycle and energy-accurate characterization
+- 📝 Documentation improvements
+
+---
+
+## Contact
+
+**Original Project (EPFL)**  
+Juan Sapriza — juan.sapriza@epfl.ch
+
+**UMA-DAC Fork**  
+Cristian Campos — cricamfe@ac.uma.es
+
+---
+
+<p align="center">
+  <sub>Built with ❤️ by <a href="https://www.epfl.ch/labs/esl/">EPFL ESL</a> and <a href="https://www.uma.es/">UMA-DAC</a></sub>
+</p>
