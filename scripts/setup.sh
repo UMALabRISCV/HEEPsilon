@@ -302,11 +302,14 @@ install_python_deps() {
     source .venv/bin/activate
     pip install --upgrade pip setuptools
     
-    # Python 3.12+ workaround: force binary wheels for ruamel.yaml
+    # Python 3.10+ workaround: force binary wheels for ruamel.yaml
     PYTHON_MINOR=$(python3 -c 'import sys; print(sys.version_info.minor)')
-    if [ "$PYTHON_MINOR" -ge 12 ]; then
-        print_step "Python 3.12+ detected - configuring pip for compatibility..."
+    if [ "$PYTHON_MINOR" -ge 10 ]; then
+        print_step "Python 3.10+ detected - configuring pip for compatibility..."
         export PIP_ONLY_BINARY="ruamel.yaml,ruamel.yaml.clib"
+        # Pre-install a newer version of ruamel.yaml that supports Python 3.10+
+        # This helps avoid building the old incompatible 0.15.100 version
+        pip install "ruamel.yaml>=0.17.21" || true
     fi
     
     # CMake 4.x workaround: pylibfst has outdated CMakeLists.txt
