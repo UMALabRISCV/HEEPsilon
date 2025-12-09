@@ -4,7 +4,7 @@
 #
 # HEEPsilon Setup Script
 # Installs all dependencies for development without Docker
-# Based on x-heep setup documentation and Dockerfile
+# Supports: Linux (Debian/Ubuntu) and macOS
 #
 # Author: Cristian Campos (UMA-DAC)
 # Date: 2025
@@ -34,6 +34,24 @@ RISCV_DIR="${TOOLS_DIR}/riscv"
 VERILATOR_DIR="${TOOLS_DIR}/verilator/${VERILATOR_VERSION}"
 VERIBLE_DIR="${TOOLS_DIR}/verible/${VERIBLE_VERSION}"
 
+# Detect operating system
+detect_os() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        OS="macos"
+        if [[ "$(uname -m)" == "arm64" ]]; then
+            ARCH="arm64"
+        else
+            ARCH="x86_64"
+        fi
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        OS="linux"
+        ARCH="$(uname -m)"
+    else
+        echo "Unsupported operating system: $OSTYPE"
+        exit 1
+    fi
+}
+
 print_banner() {
     echo ""
     echo -e "${CYAN} █████   █████ ██████████ ██████████ ███████████           ███  ████${NC}                     "
@@ -49,6 +67,7 @@ print_banner() {
     echo ""
     echo -e "  ${YELLOW}University of Málaga (UMA) - Departamento de Arquitectura de Computadores${NC}"
     echo -e "  ${YELLOW}Based on EPFL's X-HEEP and OpenEdgeCGRA${NC}"
+    echo -e "  ${YELLOW}Detected: ${OS} (${ARCH})${NC}"
     echo ""
 }
 
@@ -71,17 +90,36 @@ print_error() {
     echo -e "${RED}[✗]${NC} $1"
 }
 
-# Check if running as root
+# Check if running as root (Linux only)
 check_sudo() {
-    if [ "$EUID" -eq 0 ]; then
-        SUDO=""
+    if [ "$OS" == "linux" ]; then
+        if [ "$EUID" -eq 0 ]; then
+            SUDO=""
+        else
+            SUDO="sudo"
+        fi
     else
-        SUDO="sudo"
+        SUDO=""  # macOS uses brew without sudo
     fi
 }
 
-install_system_deps() {
-    print_header "Installing System Dependencies"
+# Check Homebrew installation (macOS)
+check_homebrew() {
+    if ! command -v brew &> /dev/null; then
+        print_error "Homebrew is not installed."
+        echo ""
+        echo "Install Homebrew first:"
+        echo '  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+        exit 1
+    fi
+}
+
+install_system_deps_linux() {
+    if ! command -v apt-get &> /dev/null; then
+        print_error "apt-get not found. This script only supports Debian/Ubuntu."
+        echo "For other distributions, please install dependencies manually."
+        exit 1
+    fi
     
     print_step "Updating package lists..."
     $SUDO apt-get update
@@ -95,47 +133,84 @@ install_system_deps() {
         ccache mold libgoogle-perftools-dev numactl libelf-dev wget libyaml-dev
     
     # Workaround for Python 3.13+ ruamel.yaml compilation issue
-    # The longintrepr.h header was moved to cpython/ subdirectory
     PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
     PYTHON_INCLUDE="/usr/include/python${PYTHON_VERSION}"
     if [ -f "${PYTHON_INCLUDE}/cpython/longintrepr.h" ] && [ ! -f "${PYTHON_INCLUDE}/longintrepr.h" ]; then
         print_step "Applying Python ${PYTHON_VERSION} header workaround..."
         $SUDO ln -sf "${PYTHON_INCLUDE}/cpython/longintrepr.h" "${PYTHON_INCLUDE}/longintrepr.h"
     fi
+}
+
+install_system_deps_macos() {
+    check_homebrew
+    
+    print_step "Installing packages via Homebrew..."
+    brew install \
+        autoconf automake libtool python@3 gmp mpfr libmpc \
+        bison flex gawk texinfo wget cmake ninja \
+        ccache zlib expat libelf help2man
+
+    print_step "Configuring Python..."
+    if ! command -v python3 &> /dev/null; then
+        echo "Please ensure Python 3 from Homebrew is in your PATH"
+    fi
+}
+
+install_system_deps() {
+    print_header "Installing System Dependencies"
+    
+    if [ "$OS" == "linux" ]; then
+        install_system_deps_linux
+    elif [ "$OS" == "macos" ]; then
+        install_system_deps_macos
+    fi
     
     print_done "System dependencies installed"
 }
 
 install_verilator() {
-    print_header "Installing Verilator ${VERILATOR_VERSION}"
+    print_header "Installing Verilator"
     
-    if [ -f "${VERILATOR_DIR}/bin/verilator" ]; then
-        print_done "Verilator already installed at ${VERILATOR_DIR}"
-        return
+    if [ "$OS" == "macos" ]; then
+        # macOS: Use Homebrew (compiling from source fails with newer clang)
+        if command -v verilator &> /dev/null; then
+            INSTALLED_VER=$(verilator --version | head -1 | awk '{print $2}')
+            print_done "Verilator ${INSTALLED_VER} already installed via Homebrew"
+            return
+        fi
+        
+        print_step "Installing Verilator via Homebrew..."
+        brew install verilator
+        
+        INSTALLED_VER=$(verilator --version | head -1 | awk '{print $2}')
+        print_done "Verilator ${INSTALLED_VER} installed via Homebrew"
+    else
+        # Linux: Compile from source for specific version
+        if [ -f "${VERILATOR_DIR}/bin/verilator" ]; then
+            print_done "Verilator already installed at ${VERILATOR_DIR}"
+            return
+        fi
+        
+        local ORIG_DIR=$(pwd)
+        
+        print_step "Cloning Verilator repository..."
+        rm -rf /tmp/verilator
+        git clone https://github.com/verilator/verilator.git /tmp/verilator
+        cd /tmp/verilator
+        git checkout v${VERILATOR_VERSION}
+        
+        print_step "Building Verilator ${VERILATOR_VERSION} (this may take a while)..."
+        autoconf
+        ./configure --prefix=${VERILATOR_DIR}
+        make -j$(nproc)
+        make install
+        
+        print_step "Cleaning up..."
+        cd "$ORIG_DIR"
+        rm -rf /tmp/verilator
+        
+        print_done "Verilator installed to ${VERILATOR_DIR}"
     fi
-    
-    local ORIG_DIR=$(pwd)
-    
-    print_step "Cloning Verilator repository..."
-    rm -rf /tmp/verilator
-    git clone https://github.com/verilator/verilator.git /tmp/verilator
-    cd /tmp/verilator
-    git checkout v${VERILATOR_VERSION}
-    
-    print_step "Building Verilator (this may take a while)..."
-    autoconf
-    ./configure --prefix=${VERILATOR_DIR}
-    make -j$(nproc)
-    make install
-    
-    print_step "Cleaning up..."
-    cd "$ORIG_DIR"
-    rm -rf /tmp/verilator
-    
-    print_done "Verilator installed to ${VERILATOR_DIR}"
-    echo ""
-    echo "Add to your ~/.bashrc:"
-    echo "  export PATH=${VERILATOR_DIR}/bin:\$PATH"
 }
 
 install_verible() {
@@ -147,18 +222,22 @@ install_verible() {
     fi
     
     print_step "Downloading Verible..."
-    wget -q https://github.com/chipsalliance/verible/releases/download/${VERIBLE_VERSION}/verible-${VERIBLE_VERSION}-linux-static-x86_64.tar.gz -O /tmp/verible.tar.gz
+    
+    if [ "$OS" == "macos" ]; then
+        VERIBLE_URL="https://github.com/chipsalliance/verible/releases/download/${VERIBLE_VERSION}/verible-${VERIBLE_VERSION}-macOS.tar.gz"
+    else
+        VERIBLE_URL="https://github.com/chipsalliance/verible/releases/download/${VERIBLE_VERSION}/verible-${VERIBLE_VERSION}-linux-static-x86_64.tar.gz"
+    fi
+    
+    wget -q "$VERIBLE_URL" -O /tmp/verible.tar.gz
     
     print_step "Extracting..."
     mkdir -p ${TOOLS_DIR}/verible
     tar -xf /tmp/verible.tar.gz -C ${TOOLS_DIR}/verible/
-    mv ${TOOLS_DIR}/verible/verible-${VERIBLE_VERSION} ${VERIBLE_DIR}
+    mv ${TOOLS_DIR}/verible/verible-${VERIBLE_VERSION}* ${VERIBLE_DIR}
     rm /tmp/verible.tar.gz
     
     print_done "Verible installed to ${VERIBLE_DIR}"
-    echo ""
-    echo "Add to your ~/.bashrc:"
-    echo "  export PATH=${VERIBLE_DIR}/bin:\$PATH"
 }
 
 install_riscv_toolchain() {
@@ -169,15 +248,38 @@ install_riscv_toolchain() {
         return
     fi
     
-    print_step "Downloading CORE-V GCC toolchain..."
     mkdir -p ${RISCV_DIR}
-    wget -qO- https://buildbot.embecosm.com/job/corev-gcc-ubuntu2204/47/artifact/corev-openhw-gcc-ubuntu2204-20240530.tar.gz | tar -xz -C ${RISCV_DIR} --strip-components=1
+    
+    if [ "$OS" == "macos" ]; then
+        # macOS uses DMG format
+        if [ "$ARCH" == "arm64" ]; then
+            TOOLCHAIN_URL="https://buildbot.embecosm.com/job/corev-gcc-macos-arm64/8/artifact/corev-openhw-gcc-macos-20240530.dmg"
+            print_step "Downloading ARM64 toolchain..."
+        else
+            TOOLCHAIN_URL="https://buildbot.embecosm.com/job/corev-gcc-macos/48/artifact/corev-openhw-gcc-macos-20240530.dmg"
+            print_step "Downloading Intel toolchain..."
+        fi
+        
+        wget -q "$TOOLCHAIN_URL" -O /tmp/corev-toolchain.dmg
+        
+        print_step "Mounting DMG..."
+        hdiutil attach /tmp/corev-toolchain.dmg -mountpoint /tmp/corev-mount -nobrowse -quiet
+        
+        print_step "Extracting toolchain..."
+        cp -R /tmp/corev-mount/corev-openhw-gcc-macos*/* ${RISCV_DIR}/
+        
+        print_step "Unmounting DMG..."
+        hdiutil detach /tmp/corev-mount -quiet
+        rm /tmp/corev-toolchain.dmg
+    else
+        # Linux (Ubuntu/Debian)
+        TOOLCHAIN_URL="https://buildbot.embecosm.com/job/corev-gcc-ubuntu2204/47/artifact/corev-openhw-gcc-ubuntu2204-20240530.tar.gz"
+        
+        print_step "Downloading CORE-V GCC toolchain..."
+        wget -qO- "$TOOLCHAIN_URL" | tar -xz -C ${RISCV_DIR} --strip-components=1
+    fi
     
     print_done "CORE-V toolchain installed to ${RISCV_DIR}"
-    echo ""
-    echo "Add to your ~/.bashrc:"
-    echo "  export RISCV_XHEEP=${RISCV_DIR}"
-    echo "  export PATH=\${RISCV_XHEEP}/bin:\$PATH"
 }
 
 install_python_deps() {
@@ -196,8 +298,7 @@ install_python_deps() {
     source .venv/bin/activate
     pip install --upgrade pip setuptools
     
-    # Python 3.12+ workaround: force binary wheels for ruamel.yaml 
-    # to avoid recompilation in isolated build environments
+    # Python 3.12+ workaround: force binary wheels for ruamel.yaml
     PYTHON_MINOR=$(python3 -c 'import sys; print(sys.version_info.minor)')
     if [ "$PYTHON_MINOR" -ge 12 ]; then
         print_step "Python 3.12+ detected - configuring pip for compatibility..."
@@ -236,10 +337,18 @@ print_env_setup() {
         SHELL_RC_SHORT="~/.bashrc"
     fi
     
-    ENV_CONFIG="
+    if [ "$OS" == "macos" ]; then
+        # macOS: Verilator is in Homebrew path, only need RISCV and Verible
+        ENV_CONFIG="
+# HEEPsilon Development Environment (added by setup.sh)
+export RISCV_XHEEP=${RISCV_DIR}
+export PATH=${VERIBLE_DIR}/bin:\${RISCV_XHEEP}/bin:\$PATH"
+    else
+        ENV_CONFIG="
 # HEEPsilon Development Environment (added by setup.sh)
 export RISCV_XHEEP=${RISCV_DIR}
 export PATH=${VERILATOR_DIR}/bin:${VERIBLE_DIR}/bin:\${RISCV_XHEEP}/bin:\$PATH"
+    fi
 
     # Check if already configured
     if grep -q "RISCV_XHEEP" "$SHELL_RC" 2>/dev/null; then
@@ -272,6 +381,8 @@ show_help() {
     echo ""
     echo "Usage: $0 [OPTIONS]"
     echo ""
+    echo "Supports: Linux (Debian/Ubuntu) and macOS"
+    echo ""
     echo "Options:"
     echo "  --all         Install everything (default)"
     echo "  --deps        Install system dependencies only"
@@ -284,6 +395,7 @@ show_help() {
 }
 
 # Main
+detect_os
 check_sudo
 
 case "${1:-}" in
