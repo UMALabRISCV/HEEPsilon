@@ -345,11 +345,16 @@ print_env_setup() {
     fi
     
     if [ "$OS" == "macos" ]; then
-        # macOS: Verilator is in Homebrew path, only need RISCV and Verible
+        # macOS: Verilator is in Homebrew path, need libelf flags for linking
+        LIBELF_PREFIX=$(brew --prefix libelf)
         ENV_CONFIG="
 # HEEPsilon Development Environment (added by setup.sh)
 export RISCV_XHEEP=${RISCV_DIR}
-export PATH=${VERIBLE_DIR}/bin:\${RISCV_XHEEP}/bin:\$PATH"
+export PATH=${VERIBLE_DIR}/bin:\${RISCV_XHEEP}/bin:\$PATH
+
+# libelf for Verilator simulation linking
+export LDFLAGS=\"-L${LIBELF_PREFIX}/lib \$LDFLAGS\"
+export CPPFLAGS=\"-I${LIBELF_PREFIX}/include \$CPPFLAGS\""
     else
         ENV_CONFIG="
 # HEEPsilon Development Environment (added by setup.sh)
