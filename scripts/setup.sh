@@ -6,6 +6,10 @@
 # Installs all dependencies for development without Docker
 # Supports: Linux (Debian/Ubuntu) and macOS
 #
+# Tested on:
+#   - macOS Tahoe 26.1 (25B78) on Apple Silicon (arm64)
+#   - Ubuntu 22.04+ on x86_64
+#
 # Author: Cristian Campos (UMA-DAC)
 # Date: 2025
 #
@@ -304,6 +308,9 @@ install_python_deps() {
         print_step "Python 3.12+ detected - configuring pip for compatibility..."
         export PIP_ONLY_BINARY="ruamel.yaml,ruamel.yaml.clib"
     fi
+    
+    # CMake 4.x workaround: pylibfst has outdated CMakeLists.txt
+    export CMAKE_POLICY_VERSION_MINIMUM=3.5
     
     pip install -r hw/vendor/esl_epfl_x_heep/util/python-requirements.txt
     
