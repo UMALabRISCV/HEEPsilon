@@ -59,15 +59,17 @@ muxB_list = ['ZERO', 'SELF', 'RCL', 'RCR', 'RCT', 'RCB', 'R0', 'R1', 'R2', 'R3',
 # Note: SLL/SRL are the correct names, SLT/SRT are legacy aliases
 ALU_op_list = ['NOP',
                'SADD', 'SSUB', 'SMUL', 'FXPMUL',
-               'SLL', 'SRL', 'SRA',  # Shift Left/Right Logical, Shift Right Arithmetic
-               'LAND', 'LOR', 'LXOR', 'LNAND', 'LNOR', 'LXNOR',
+               'SLL', 'SRL', 'SRA',  # Shifts: SLL/SRL are RTL names (SLT/SRT are legacy)
+               'LAND', 'LOR', 'LXOR', 'LNAND', 'LNOR', 'LNXOR',
                'BSFA', 'BZFA',
                'BEQ', 'BNE', 'BLT', 'BGE', 'JUMP',
                'LWD', 'SWD', 'LWI', 'SWI',
                'EXIT']
 
-# Aliases for backward compatibility (SLT=SLL, SRT=SRL)
-ALU_ALIASES = {'SLT': 'SLL', 'SRT': 'SRL', 'LXNOR': 'LXNOR'}
+# Aliases for backward compatibility and RTL matching
+# SLT/SRT are legacy/ISA names for SLL/SRL
+# LXNOR is the ISA name for the RTL opcode LNXOR
+ALU_ALIASES = {'SLT': 'SLL', 'SRT': 'SRL', 'LXNOR': 'LNXOR'}
 
 reg_dest_list = ['R0', 'R1', 'R2', 'R3']
 reg_we_list = ['0', '1']
@@ -127,6 +129,8 @@ def parse_instruction_string(instr_str: str) -> List[str]:
         reg = parts[1].upper() if len(parts) > 1 else '-'
         inc = parts[2] if len(parts) > 2 else '4'
         if op == 'LWD':
+            if reg not in reg_dest_list:
+                print(f"WARNING: LWD destination '{reg}' is not a valid register (R0-R3). Data will be lost.")
             return ['-', '-', 'LWD', reg, '-', inc]
         else:
             src = reg if reg != 'ROUT' else 'SELF'
