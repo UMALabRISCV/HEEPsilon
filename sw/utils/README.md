@@ -41,7 +41,7 @@ Produces a Graphviz DOT file showing temporal (Registers) and spatial (Neighbors
 
 ### 3. `generate_bitstream.py` (Template)
 The core logic for encoding CSV instructions into the 32-bit CGRA ISA.
-*Note: This script is automatically copied to the `utils/` folder of every generated application.*
+*Note: This script is central and used by `cgra_create_app.py`.*
 
 ## Typical Workflow
 

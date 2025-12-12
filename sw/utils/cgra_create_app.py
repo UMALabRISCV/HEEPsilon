@@ -143,7 +143,7 @@ def create_app(csv_path, app_name, output_base, custom_inputs=None, offsets_str=
         print(f"Warning: Directory {app_dir} already exists. Overwriting.")
     else:
         os.makedirs(app_dir)
-    os.makedirs(utils_dir, exist_ok=True)
+        os.makedirs(app_dir)
     
     # 1. Analyze Logic
     print(f"Analyzing {csv_path}...")
@@ -287,11 +287,8 @@ def create_app(csv_path, app_name, output_base, custom_inputs=None, offsets_str=
     shutil.copy(csv_path, os.path.join(app_dir, "instructions.csv"))
     
     # Copy Generator
-    gen_src = "sw/utils/generate_bitstream.py"
-    if not os.path.exists(gen_src):
-        print(f"ERROR: Centralized generator not found at {gen_src}")
-    else:
-        shutil.copy(gen_src, os.path.join(utils_dir, "generate_bitstream.py"))
+    # (Removed: Using centralized sw/utils/generate_bitstream.py)
+
     
     # 4. Visualization (Phase 10)
     if visualize:
@@ -316,7 +313,15 @@ def create_app(csv_path, app_name, output_base, custom_inputs=None, offsets_str=
     
     # 5. Run Generator
     print("Generating bitstream...")
-    ret = os.system(f"cd {app_dir} && python3 utils/generate_bitstream.py instructions.csv -o cgra_bitstream.h")
+    # Use absolute path or relative from CWD to sw/utils
+    generator_script = "sw/utils/generate_bitstream.py"
+    cmd = f"python3 {generator_script} {app_dir}/instructions.csv -o {app_dir}/cgra_bitstream.h"
+    if memory_file:
+         # Need to handle memory file path if provided
+         # If memory_file is relative, it's relative to CWD.
+         cmd += f" -m {memory_file}"
+         
+    ret = os.system(cmd)
     
     if ret == 0:
         print("\\nDONE! To run:")
