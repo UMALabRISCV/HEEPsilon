@@ -1,0 +1,1243 @@
+\documentclass[11pt,a4paper]{article}
+
+% =====================================================================
+% PAQUETES
+% =====================================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish]{babel}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{fancybox}
+\usepackage{mdframed}
+\usepackage{multirow}
+\usepackage{colortbl}
+
+\geometry{margin=2.5cm}
+
+% =====================================================================
+% COLORES Y ESTILOS
+% =====================================================================
+\definecolor{codeblue}{RGB}{0,102,204}
+\definecolor{codegray}{RGB}{128,128,128}
+\definecolor{headerblue}{RGB}{41,65,114}
+\definecolor{lightgray}{RGB}{245,245,245}
+\definecolor{warnorange}{RGB}{255,153,0}
+\definecolor{successgreen}{RGB}{0,128,0}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=codeblue,
+    urlcolor=codeblue,
+    citecolor=codeblue
+}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{codeblue}\bfseries,
+    commentstyle=\color{codegray}\itshape,
+    frame=single,
+    backgroundcolor=\color{lightgray},
+    breaklines=true,
+    tabsize=4
+}
+
+% =====================================================================
+% CABECERA Y PIE DE PAGINA
+% =====================================================================
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\textsc{OpenEdge CGRA ISA v2.0.1}}
+\fancyhead[R]{\thepage}
+\fancyfoot[C]{\footnotesize Verificado contra RTL (cgra\_pkg.sv, alu.sv, datapath.sv)}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.2pt}
+
+% =====================================================================
+% TITULO
+% =====================================================================
+\title{
+    \vspace{-2cm}
+    {\Huge\bfseries\color{headerblue} OpenEdge CGRA}\\[0.3cm]
+    {\Large Especificacion del Conjunto de Instrucciones (ISA)}\\[0.5cm]
+    {\normalsize Version 2.0.1 -- Verificado contra implementacion RTL}
+}
+\author{
+    \textbf{Embedded Systems Laboratory (ESL-EPFL)}
+}
+\date{Diciembre 2024}
+
+% =====================================================================
+% DOCUMENTO
+% =====================================================================
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Este documento describe la Arquitectura del Conjunto de Instrucciones (ISA) del 
+OpenEdge CGRA (Coarse-Grained Reconfigurable Array). Toda la informacion ha sido 
+verificada contra la implementacion RTL en SystemVerilog del repositorio oficial 
+\texttt{esl-epfl/OpenEdgeCGRA}. Se incluyen los opcodes exactos, el mapeo de 
+multiplexores, la semantica de flags, y las caracteristicas de latencia del 
+pipeline.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+% =====================================================================
+\section{Vision General de la Arquitectura}
+% =====================================================================
+
+El OpenEdge CGRA es un acelerador de grano grueso reconfigurable disenado para 
+experimentos de investigacion en compiladores y proyectos de bajo consumo 
+como HEEPocrates.
+
+\subsection{Parametros Configurables}
+
+Segun \texttt{cgra\_pkg.sv.tpl}, los parametros principales son:
+
+\begin{table}[h]
+\centering
+\caption{Parametros del CGRA (valores por defecto)}
+\begin{tabular}{llp{7cm}}
+\toprule
+\textbf{Parametro} & \textbf{Valor} & \textbf{Descripcion} \\
+\midrule
+\texttt{N\_ROW} & 4 & Numero de filas \\
+\texttt{N\_COL} & 4 & Numero de columnas \\
+\texttt{DP\_WIDTH} & 32 & Ancho del datapath (bits) \\
+\texttt{INSTR\_WIDTH} & 32 & Ancho de instruccion (bits) \\
+\texttt{RC\_NUM\_REG} & 4 & Registros internos por RC (R0-R3) \\
+\texttt{RC\_CONST\_WIDTH} & 13 & Bits del campo inmediato \\
+\texttt{ALU\_N\_FLAG} & 2 & Numero de flags (sign, zero) \\
+\texttt{CGRA\_ALU\_OP\_WIDTH} & 5 & Bits del opcode ALU \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Topologia}
+
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{Malla Toroidal}: Cada RC conecta con sus 4 vecinos (N, S, E, O).
+          Los bordes se conectan ciclicamente.
+    \item \textbf{Control por Columna}: PC compartido por columna. Las columnas 
+          pueden sincronizarse para kernels multi-columna.
+    \item \textbf{Compatibilidad}: Soporta configuraciones 2$\times$2 y 3$\times$3.
+\end{itemize}
+
+\begin{verbatim}
+         Col 0       Col 1       Col 2       Col 3
+       +-------+   +-------+   +-------+   +-------+
+Row 0  |RC(0,0)|<->|RC(0,1)|<->|RC(0,2)|<->|RC(0,3)|<-+
+       +-------+   +-------+   +-------+   +-------+  |
+          ^           ^           ^           ^       | (Wrap)
+          v           v           v           v       v
+       +-------+   +-------+   +-------+   +-------+  |
+Row 3  |RC(3,0)|<->|RC(3,1)|<->|RC(3,2)|<->|RC(3,3)|<-+
+       +-------+   +-------+   +-------+   +-------+
+\end{verbatim}
+
+\subsection{Modelo de Latencia de Comunicacion}
+
+\begin{mdframed}[backgroundcolor=lightgray, linecolor=headerblue, linewidth=1pt]
+\textbf{Regla Fundamental:} Los resultados de una RC estan disponibles para 
+sus vecinos \textbf{un ciclo despues}. 
+
+\textbf{Ejemplo:} Si RC(0,0) calcula un valor en ciclo $t$, sus vecinos pueden 
+leerlo en ciclo $t+1$ via \texttt{RCL}, \texttt{RCR}, \texttt{RCT}, o \texttt{RCB}.
+
+\textbf{RTL:} Ver \texttt{cgra\_rcs.sv} lineas 348-378 donde \texttt{rcs\_mesh\_res} 
+y \texttt{rcs\_mesh\_flag} usan valores \textbf{registrados}.
+\end{mdframed}
+
+% =====================================================================
+\section{Formato de Palabra de Configuracion (16 bits)}
+% =====================================================================
+
+Antes de ejecutar un kernel, el CGRA se configura con una palabra de 16 bits.
+
+\begin{table}[h]
+\centering
+\caption{Palabra de Configuracion del Kernel}
+\begin{tabular}{cclp{6cm}}
+\toprule
+\textbf{Bits} & \textbf{Ancho} & \textbf{Campo} & \textbf{Descripcion} \\
+\midrule
+15:12 & 4 & \texttt{\#COLUMNS} & Columnas activas (one-hot) \\
+11:5 & 7 & \texttt{KERNEL\_ADDR} & Direccion de inicio (\texttt{RCS\_IMEM\_ADD}) \\
+4:0 & 5 & \texttt{\#INSTR} & Longitud del kernel (\texttt{RCS\_NUM\_CREG}) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{RTL:} Definido en \texttt{cgra\_pkg.sv.tpl}, lineas 126-133.
+
+% =====================================================================
+\section{Formato de Instruccion (32 bits)}
+% =====================================================================
+
+\begin{table}[h]
+\centering
+\caption{Formato de Instruccion}
+\begin{tabular}{cclp{5.5cm}}
+\toprule
+\textbf{Bits} & \textbf{Ancho} & \textbf{Campo} & \textbf{Descripcion} \\
+\midrule
+31:28 & 4 & \texttt{MUXA\_SEL} & Selector operando A \\
+27:24 & 4 & \texttt{MUXB\_SEL} & Selector operando B \\
+23:19 & 5 & \texttt{ALU\_OP} & Codigo de operacion \\
+18:17 & 2 & \texttt{RF\_SEL} & Registro destino (0=R0, 1=R1, 2=R2, 3=R3) \\
+16 & 1 & \texttt{RF\_WE} & Write Enable para RF\_SEL \\
+15:13 & 3 & \texttt{MUXF\_SEL} & Selector de flags (BSFA/BZFA) \\
+12:0 & 13 & \texttt{IMM} & Inmediato (sign-extended a 32 bits) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{RTL:} Decodificacion en \texttt{datapath.sv}, lineas 72-79.
+
+% =====================================================================
+\section{Selectores de Multiplexor}
+% =====================================================================
+
+\subsection{Selector de Operandos (MUXA\_SEL / MUXB\_SEL)}
+
+\textbf{RTL:} \texttt{datapath.sv}, lineas 218-250.
+
+\begin{table}[h]
+\centering
+\caption{Codificacion MUXA\_SEL / MUXB\_SEL (4 bits)}
+\begin{tabular}{clll}
+\toprule
+\textbf{Val} & \textbf{Mnemonic} & \textbf{Fuente RTL} & \textbf{Descripcion} \\
+\midrule
+0 & \texttt{ZERO} & \texttt{'0} & Cero hardcoded \\
+1 & \texttt{SELF} & \texttt{own\_res\_i} & Resultado propio (ciclo anterior) \\
+2 & \texttt{RCL} & \texttt{left\_res\_i} & Vecino izquierdo \\
+3 & \texttt{RCR} & \texttt{right\_res\_i} & Vecino derecho \\
+4 & \texttt{RCT} & \texttt{top\_res\_i} & Vecino superior \\
+5 & \texttt{RCB} & \texttt{bottom\_res\_i} & Vecino inferior \\
+6 & \texttt{R0} & \texttt{regs\_rdata[0]} & Registro interno 0 \\
+7 & \texttt{R1} & \texttt{regs\_rdata[1]} & Registro interno 1 \\
+8 & \texttt{R2} & \texttt{regs\_rdata[2]} & Registro interno 2 \\
+9 & \texttt{R3} & \texttt{regs\_rdata[3]} & Registro interno 3 \\
+10 & \texttt{IMM} & \texttt{imm\_sign\_ext} & Inmediato sign-extended \\
+11-15 & --- & \texttt{'0} & Reservado \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Selector de Flags (MUXF\_SEL)}
+
+Usado exclusivamente por \texttt{BSFA} y \texttt{BZFA}.
+
+\textbf{RTL:} \texttt{datapath.sv}, lineas 252-259.
+
+\begin{table}[h]
+\centering
+\caption{Codificacion MUXF\_SEL (3 bits)}
+\begin{tabular}{clll}
+\toprule
+\textbf{Val} & \textbf{Mnemonic} & \textbf{Fuente RTL} & \textbf{Descripcion} \\
+\midrule
+0 & \texttt{PREV} & \texttt{own\_flag\_i} & Flags propios (ciclo anterior) \\
+1 & \texttt{RCL} & \texttt{left\_flag\_i} & Flags vecino izquierdo \\
+2 & \texttt{RCR} & \texttt{right\_flag\_i} & Flags vecino derecho \\
+3 & \texttt{RCT} & \texttt{top\_flag\_i} & Flags vecino superior \\
+4 & \texttt{RCB} & \texttt{bottom\_flag\_i} & Flags vecino inferior \\
+5-7 & --- & \texttt{'0} & Reservado \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Generacion de Flags}
+
+\textbf{RTL:} \texttt{alu.sv}, linea 427:
+\begin{verbatim}
+assign flag_o = {alu_res_o[DP_WIDTH-1], ~(|alu_res_o)};
+\end{verbatim}
+
+\begin{itemize}
+    \item \textbf{flag[1] = Sign Flag}: Bit 31 del resultado (1 si negativo).
+    \item \textbf{flag[0] = Zero Flag}: NOR de todos los bits (1 si resultado = 0).
+\end{itemize}
+
+% =====================================================================
+\section{Repertorio de Instrucciones}
+% =====================================================================
+
+Todos los opcodes verificados contra \texttt{cgra\_pkg.sv.tpl}, lineas 89-114.
+
+\subsection{Tipo 0: Control}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{cclp{6cm}}
+\toprule
+\textbf{Opcode} & \textbf{Binario} & \textbf{Mnemonic} & \textbf{Descripcion} \\
+\midrule
+0 & \texttt{00000} & \texttt{NOP} & No operacion. ROUT mantiene valor. \\
+25 & \texttt{11001} & \texttt{EXIT} & Notifica fin del kernel. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Tipo 1: Aritmetico-Logicas}
+
+\textbf{Formato:} \texttt{OP rd, rs1, rs2}
+
+\begin{longtable}{cclp{4.5cm}c}
+\caption{Instrucciones ALU} \\
+\toprule
+\textbf{Opc} & \textbf{Binario} & \textbf{Mnem} & \textbf{Descripcion} & \textbf{Stall} \\
+\midrule
+\endfirsthead
+\midrule
+\endhead
+1 & \texttt{00001} & \texttt{SADD} & Suma con signo & No \\
+2 & \texttt{00010} & \texttt{SSUB} & Resta con signo & No \\
+3 & \texttt{00011} & \texttt{SMUL} & Mult. 32$\times$32$\to$32 (LSB) & \textbf{Si} \\
+4 & \texttt{00100} & \texttt{FXPMUL} & Mult. punto fijo Q1.16.15 & \textbf{Si} \\
+5 & \texttt{00101} & \texttt{SLT/SLL} & Shift left logical & No \\
+6 & \texttt{00110} & \texttt{SRT/SRL} & Shift right logical & No \\
+7 & \texttt{00111} & \texttt{SRA} & Shift right arithmetic & No \\
+8 & \texttt{01000} & \texttt{LAND} & AND bit a bit & No \\
+9 & \texttt{01001} & \texttt{LOR} & OR bit a bit & No \\
+10 & \texttt{01010} & \texttt{LXOR} & XOR bit a bit & No \\
+11 & \texttt{01011} & \texttt{LNAND} & NAND bit a bit & No \\
+12 & \texttt{01100} & \texttt{LNOR} & NOR bit a bit & No \\
+13 & \texttt{01101} & \texttt{LXNOR} & XNOR bit a bit & No \\
+\bottomrule
+\end{longtable}
+
+\begin{mdframed}[backgroundcolor=lightgray, linecolor=warnorange, linewidth=1pt]
+\textbf{Nota sobre Stall:} Segun \texttt{alu.sv} linea 430, solo \texttt{SMUL} y 
+\texttt{FXPMUL} generan stall. El pipeline se detiene hasta que la multiplicacion 
+complete.
+\end{mdframed}
+
+\subsection{Tipo 2: Seleccion Condicional (BSFA/BZFA)}
+
+Estas instrucciones permiten seleccion condicional sin saltos, basandose en 
+los flags del ciclo anterior.
+
+\subsubsection{Formato de Instruccion}
+
+\textbf{Sintaxis:} \texttt{OP rd, rsA, rsB, flag\_src}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{cclp{5.5cm}}
+\toprule
+\textbf{Opc} & \textbf{Binario} & \textbf{Mnem} & \textbf{Semantica} \\
+\midrule
+14 & \texttt{01110} & \texttt{BSFA} & \texttt{rd = sign ? rsA : rsB} \\
+15 & \texttt{01111} & \texttt{BZFA} & \texttt{rd = zero ? rsA : rsB} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Codificacion de Bits}
+
+\begin{table}[h]
+\centering
+\caption{Campos de instruccion BSFA/BZFA}
+\begin{tabular}{ccp{6cm}}
+\toprule
+\textbf{Bits} & \textbf{Campo} & \textbf{Significado} \\
+\midrule
+31:28 & MUXA\_SEL & rsA: valor si condicion es verdadera \\
+27:24 & MUXB\_SEL & rsB: valor si condicion es falsa \\
+23:19 & ALU\_OP & 14 (BSFA) o 15 (BZFA) \\
+18:17 & RF\_SEL & Registro destino (0-3) \\
+16 & RF\_WE & 1 para escribir en registro \\
+15:13 & MUXF\_SEL & flag\_src: fuente del flag \\
+12:0 & IMM & No utilizado \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Flujo de Datos Detallado}
+
+El siguiente diagrama muestra el flujo completo desde la generacion del flag 
+hasta su uso:
+
+\begin{verbatim}
+=== CICLO t-1: Generacion del Flag ===
+
+RC ejecuta operacion (ej: SSUB R3, R2, P)
+              |
+              v
+ALU calcula resultado
+              |
+              v
+flag_o = {result[31], ~(|result)}   <- alu.sv linea 427
+  flag[1] = bit de signo (1 si negativo)
+  flag[0] = zero flag (1 si resultado = 0)
+              |
+              v
+rcs_flag[row][col] = flag_o         <- Senal combinacional
+              |
+              v
+[Flanco de reloj]
+              |
+              v
+rcs_flag_reg[row][col] <= rcs_flag  <- cgra_rcs.sv linea 244
+
+=== CICLO t: Uso del Flag en BSFA ===
+
+rcs_mesh_flag[row][col] = rcs_flag_reg   <- Valores REGISTRADOS
+              |
+              v
++------------------------------------------+
+| Conexiones a reconfigurable_cell:        |
+|                                          |
+|  own_flag_i    = mesh_flag[i][j]    PREV |
+|  left_flag_i   = mesh_flag[i][j-1]  RCL  |
+|  right_flag_i  = mesh_flag[i][j+1]  RCR  |
+|  top_flag_i    = mesh_flag[i-1][j]  RCT  |
+|  bottom_flag_i = mesh_flag[i+1][j]  RCB  |
++------------------------------------------+
+              |
+              v
+mux_flag_sel = MUXF_SEL de instruccion (bits 15:13)
+              |
+              v
+mux_flag_out = mux_flag_inputs[mux_flag_sel]
+              |
+              v
++------------------------------------------+
+| alu.sv lineas 346-347:                   |
+|                                          |
+| sign_flag = flag_i[1] & ctrl_flow_e      |
+| zero_flag = flag_i[0] & ctrl_flow_e      |
++------------------------------------------+
+              |
+              v
++------------------------------------------+
+| alu.sv lineas 369-370:                   |
+|                                          |
+| BSFA: result = sign_flag ? A : B         |
+| BZFA: result = zero_flag ? A : B         |
++------------------------------------------+
+\end{verbatim}
+
+\subsubsection{Punto Clave: Temporalidad de Flags}
+
+\begin{mdframed}[backgroundcolor=lightgray, linecolor=headerblue, linewidth=2pt]
+\textbf{TODOS los flags son del ciclo anterior.}
+
+Esto es porque pasan por el registro \texttt{rcs\_flag\_reg} antes de 
+llegar a \texttt{rcs\_mesh\_flag}. Ver \texttt{cgra\_rcs.sv} lineas 243-244:
+
+\begin{verbatim}
+rcs_res_reg[k][j]  <= rcs_res[k][j];
+rcs_flag_reg[k][j] <= rcs_flag[k][j];
+\end{verbatim}
+
+Incluso \texttt{PREV} (el flag ``propio'') es del ciclo anterior, no del 
+ciclo actual.
+\end{mdframed}
+
+\subsubsection{Ejemplo Detallado: Correccion Modular}
+
+Objetivo: Calcular $r = (r - P)$ si $r \geq P$, sino mantener $r$.
+
+\begin{verbatim}
+Ciclo t:   SSUB R3, R2, RCL    ; R3 = R2 - P
+                                ;
+                                ; La ALU calcula R2 - P:
+                                ;   Si R2 < P: resultado negativo
+                                ;              -> sign_flag = 1
+                                ;   Si R2 >= P: resultado >= 0
+                                ;              -> sign_flag = 0
+                                ;
+                                ; El flag se REGISTRA al final del ciclo
+
+Ciclo t+1: BSFA R3, R2, R3, PREV
+                                ; MUXF_SEL = 0 (PREV)
+                                ; Lee own_flag_i = flag del ciclo anterior
+                                ;
+                                ; Si sign_flag == 1 (resultado fue negativo):
+                                ;     R3 = R2  <- Valor original (rsA)
+                                ;     (no habia que corregir)
+                                ;
+                                ; Si sign_flag == 0 (resultado fue >= 0):
+                                ;     R3 = R3  <- Valor ya restado (rsB)
+                                ;     (la correccion era necesaria)
+\end{verbatim}
+
+\subsubsection{Usando Flags de Vecinos}
+
+BSFA/BZFA pueden usar flags de PEs vecinos para sincronizacion:
+
+\begin{verbatim}
+; PE(0,0) calcula y genera flag
+Ciclo t:   SSUB R0, R1, R2      ; PE(0,0): actualiza su sign_flag
+
+; PE(0,1) usa el flag de su vecino izquierdo
+Ciclo t+1: BSFA R3, R0, R1, RCL ; PE(0,1): lee flag de PE(0,0)
+                                ; RCL = left_flag_i = flag de PE(0,0)
+\end{verbatim}
+
+\subsubsection{RTL Verificado}
+
+\texttt{alu.sv}, lineas 364-374:
+\begin{verbatim}
+always_comb begin
+  ctrl_flow_res = ctrl_flow_in_a;
+  unique case (alu_op_i)
+    CGRA_ALU_BSFA: ctrl_flow_res = sign_flag ? ctrl_flow_in_a 
+                                             : ctrl_flow_in_b;
+    CGRA_ALU_BZFA: ctrl_flow_res = zero_flag ? ctrl_flow_in_a 
+                                             : ctrl_flow_in_b;
+    default: ;
+  endcase
+end
+\end{verbatim}
+
+\subsection{Tipo 3: Saltos Condicionales}
+
+\textbf{Formato:} \texttt{OP rs1, rs2, addr} (addr en campo IMM)
+
+\begin{table}[h]
+\centering
+\begin{tabular}{cclp{5cm}}
+\toprule
+\textbf{Opc} & \textbf{Binario} & \textbf{Mnem} & \textbf{Condicion} \\
+\midrule
+16 & \texttt{10000} & \texttt{BEQ} & Salta si rs1 == rs2 \\
+17 & \texttt{10001} & \texttt{BNE} & Salta si rs1 != rs2 \\
+18 & \texttt{10010} & \texttt{BLT} & Salta si rs1 $<$ rs2 (signed) \\
+19 & \texttt{10011} & \texttt{BGE} & Salta si rs1 $\geq$ rs2 (signed) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Nota:} Para comparar con cero, use \texttt{ZERO} como operando ya que 
+el campo IMM contiene la direccion de salto.
+
+\begin{mdframed}[backgroundcolor=lightgray, linecolor=warnorange, linewidth=1pt]
+\textbf{Advertencia Importante:} No es posible usar un valor inmediato como operando de comparacion (ej: \texttt{BNE R0, -1, etiqueta}) porque el campo \texttt{IMM} de 13 bits esta ocupado por la direccion de salto (\texttt{etiqueta}). 
+
+Si necesita comparar con una constante (distinta de cero), debe cargar dicha constante en un registro (R0-R3) o recuperarla de un vecino (RCL, RCR, etc.) antes de ejecutar el branch.
+\end{mdframed}
+
+\subsection{Tipo 4: Salto Incondicional}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{cclp{5cm}}
+\toprule
+\textbf{Opc} & \textbf{Binario} & \textbf{Mnem} & \textbf{Descripcion} \\
+\midrule
+20 & \texttt{10100} & \texttt{JUMP} & PC = rs1 + rs2 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Tipo 5: Memoria Directa (Streaming)}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{cclp{5cm}}
+\toprule
+\textbf{Opc} & \textbf{Binario} & \textbf{Mnem} & \textbf{Descripcion} \\
+\midrule
+21 & \texttt{10101} & \texttt{LWD} & Load + autoincremento puntero \\
+22 & \texttt{10110} & \texttt{SWD} & Store + autoincremento puntero \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{RTL:} El campo IMM especifica el incremento del puntero (\texttt{datapath.sv} 
+linea 69):
+\begin{verbatim}
+assign add_inc_o = (alu_op == CGRA_ALU_LWD | alu_op == CGRA_ALU_SWD) 
+                    ? imm_val : '0;
+\end{verbatim}
+
+\subsection{Tipo 6: Memoria Indirecta (Scatter/Gather)}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{cclp{5cm}}
+\toprule
+\textbf{Opc} & \textbf{Binario} & \textbf{Mnem} & \textbf{Descripcion} \\
+\midrule
+23 & \texttt{10111} & \texttt{LWI} & Load desde direccion en operando B \\
+24 & \texttt{11000} & \texttt{SWI} & Store a direccion en operando B \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Restriccion:} Solo una RC por columna puede emitir LWI/SWI a la vez.
+
+% =====================================================================
+\section{Detalles de Implementacion}
+% =====================================================================
+
+\subsection{Registro de Salida (ROUT)}
+
+El resultado de la ALU se escribe en dos lugares:
+
+\begin{enumerate}
+    \item \textbf{Siempre} al registro de salida (ROUT), conectado a vecinos.
+    \item \textbf{Opcionalmente} a un registro interno (R0-R3) si \texttt{RF\_WE=1}.
+\end{enumerate}
+
+\textbf{Excepcion:} Con \texttt{NOP}, ROUT mantiene su valor anterior.
+
+\subsection{SELF: Resultado Propio Registrado}
+
+El operando \texttt{SELF} es una de las fuentes mas importantes pero menos 
+documentadas del CGRA. Su comprension es fundamental para disenar kernels 
+correctos.
+
+\subsubsection{Definicion}
+
+\texttt{SELF} corresponde al \textbf{resultado registrado del ciclo anterior} 
+del mismo PE, NO al resultado combinacional del ciclo actual.
+
+\textbf{RTL:} En \texttt{datapath.sv}, linea 219:
+\begin{verbatim}
+assign mux_a_inputs[ 1] = own_res_i;  // SELF
+\end{verbatim}
+
+Y en \texttt{cgra\_rcs.sv}, lineas 354 y 413:
+\begin{verbatim}
+rcs_mesh_res[k][l] = rcs_res_reg[k][l];  // Valor REGISTRADO
+// ...
+.own_res_i ( rcs_mesh_res[i][j] ),       // Conectado a SELF
+\end{verbatim}
+
+\subsubsection{Diagrama de Temporizado}
+
+\begin{verbatim}
+Ciclo:        |  N-1  |   N   |  N+1  |  N+2  |
+              +-------+-------+-------+-------+
+ALU calcula:  | val_A | val_B | val_C | val_D |
+              +-------+-------+-------+-------+
+SELF vale:    |   X   | val_A | val_B | val_C |
+              +-------+-------+-------+-------+
+                       ^^^^^^^
+        SELF en ciclo N = resultado ALU de ciclo N-1
+\end{verbatim}
+
+\begin{mdframed}[backgroundcolor=lightgray, linecolor=warnorange, linewidth=1pt]
+\textbf{Punto Critico:} Es imposible usar el resultado de la ALU en el 
+\textbf{mismo ciclo} como operando. Si calculas un valor en ciclo $t$, 
+solo puede usarse como \texttt{SELF} (o \texttt{RCx}) en ciclo $t+1$.
+\end{mdframed}
+
+\subsubsection{Comparacion: SELF vs Registros (R0-R3)}
+
+\begin{table}[h]
+\centering
+\caption{Diferencias entre SELF y Registros Internos}
+\begin{tabular}{p{3cm}ccp{4cm}}
+\toprule
+\textbf{Caracteristica} & \textbf{SELF} & \textbf{R0-R3} & \textbf{Notas} \\
+\midrule
+Fuente & ROUT registrado & RF interno & Diferentes registros \\
+Latencia escritura & 1 ciclo & 1 ciclo & Ambos tardan 1 ciclo \\
+Visible a vecinos & Si (\texttt{RCx}) & No & Solo ROUT se propaga \\
+Escritura explicita & No (automatico) & Si (\texttt{RF\_WE=1}) & ROUT siempre se actualiza \\
+Persistencia & 1 ciclo & Hasta overwrite & R0-R3 retienen valor \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Casos de Uso Comunes}
+
+\textbf{1. Acumulador (patron incorrecto vs correcto):}
+
+\begin{verbatim}
+; INCORRECTO - SELF no tiene el valor que esperas!
+LWD  -,   -,  4       ; Ciclo 0: Carga dato -> ROUT = dato
+SADD SELF, RCB, -     ; Ciclo 1: SELF = dato(ok), resultado -> ROUT
+SADD SELF, RCB, -     ; Ciclo 2: SELF = suma anterior (ok!)
+
+; CORRECTO - El primer SELF en ciclo 1 es el LWD del ciclo 0
+; Este patron funciona para acumulacion continua
+\end{verbatim}
+
+\textbf{2. Store a memoria usando SELF:}
+
+\begin{verbatim}
+; El valor a guardar esta en SELF (calculado en ciclo anterior)
+SWD  SELF, -, -, 4    ; MUX_A = SELF = valor a escribir
+                      ; El campo IMM (4) es el incremento del puntero
+\end{verbatim}
+
+\textbf{3. Patron de suma con latencia (correcto):}
+
+\begin{verbatim}
+Ciclo 0: SADD R0, R1, -     ; Calcula R0+R1 -> ROUT
+Ciclo 1: SADD SELF, R2, -   ; SELF = (R0+R1), calcula + R2 -> ROUT
+Ciclo 2: SWD  SELF, -, 4    ; SELF = ((R0+R1)+R2), escribe a memoria
+\end{verbatim}
+
+\subsubsection{SELF vs RCx (Vecinos)}
+
+Todos siguen la misma regla de latencia de 1 ciclo:
+
+\begin{verbatim}
+PE(row, col):
+  SELF = valor de ROUT[row][col] del ciclo anterior
+  RCL  = valor de ROUT[row][col-1] del ciclo anterior (izquierda)
+  RCR  = valor de ROUT[row][col+1] del ciclo anterior (derecha)
+  RCT  = valor de ROUT[row-1][col] del ciclo anterior (arriba)
+  RCB  = valor de ROUT[row+1][col] del ciclo anterior (abajo)
+\end{verbatim}
+
+\textbf{RTL:} \texttt{cgra\_rcs.sv}, lineas 349-378, donde \texttt{rcs\_mesh\_res} 
+conecta los registros de salida en topologia toroidal.
+
+\subsubsection{NOP y Preservacion de SELF}
+
+\textbf{RTL:} \texttt{cgra\_rcs.sv}, lineas 242-245:
+\begin{verbatim}
+if (rcs_nop_s[k][j] == 1'b0) begin        // No es NOP
+  rcs_res_reg[k][j]  <= rcs_res[k][j];    // Actualiza ROUT
+end
+// Si es NOP, rcs_res_reg MANTIENE su valor anterior
+\end{verbatim}
+
+\textbf{Implicacion:} Durante un \texttt{NOP}, el valor de \texttt{SELF} 
+(y lo que los vecinos ven via \texttt{RCx}) permanece \textbf{sin cambiar}.
+
+\subsubsection{SELF despues de LWD}
+
+Cuando se ejecuta \texttt{LWD}, el dato leido de memoria va directamente 
+al registro de salida (\texttt{rcs\_res\_reg}):
+
+\textbf{RTL:} \texttt{cgra\_rcs.sv}, lineas 246-256:
+\begin{verbatim}
+if (data_req_s[k][j] == 1'b1) begin       // Hay request de datos
+  if (rvalid_demux[j][k] == 1'b1) begin   // Dato disponible
+    rcs_res_reg[k][j] <= data_rdata_i[j]; // Dato -> ROUT
+  end
+end
+\end{verbatim}
+
+Por lo tanto, despues de un \texttt{LWD} (o \texttt{LWI}), \texttt{SELF} 
+contendra el dato leido de memoria, disponible en el ciclo siguiente.
+
+\subsection{Latencia por Operacion}
+
+\begin{table}[h]
+\centering
+\caption{Caracteristicas de Latencia}
+\begin{tabular}{lcl}
+\toprule
+\textbf{Tipo} & \textbf{Ciclos} & \textbf{Notas} \\
+\midrule
+ALU simples & 1 & SADD, SSUB, shifts, logicas \\
+Multiplicacion & 1+stall & El pipeline se detiene \\
+LWD/SWD & 2-3 & Depende del bus \\
+LWI/SWI & 3-5 & Arbitraje por columna \\
+Branches & 1 & Comparacion en 1 ciclo \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% =====================================================================
+\section{Apendice A: Referencia Rapida de Opcodes}
+% =====================================================================
+
+\begin{longtable}{clcc}
+\caption{Tabla Completa de Opcodes} \\
+\toprule
+\textbf{Dec} & \textbf{Mnemonic} & \textbf{Binario} & \textbf{Tipo} \\
+\midrule
+\endfirsthead
+\midrule
+\endhead
+0 & NOP & 00000 & 0 \\
+1 & SADD & 00001 & 1 \\
+2 & SSUB & 00010 & 1 \\
+3 & SMUL & 00011 & 1 \\
+4 & FXPMUL & 00100 & 1 \\
+5 & SLT/SLL & 00101 & 1 \\
+6 & SRT/SRL & 00110 & 1 \\
+7 & SRA & 00111 & 1 \\
+8 & LAND & 01000 & 1 \\
+9 & LOR & 01001 & 1 \\
+10 & LXOR & 01010 & 1 \\
+11 & LNAND & 01011 & 1 \\
+12 & LNOR & 01100 & 1 \\
+13 & LXNOR & 01101 & 1 \\
+14 & BSFA & 01110 & 2 \\
+15 & BZFA & 01111 & 2 \\
+16 & BEQ & 10000 & 3 \\
+17 & BNE & 10001 & 3 \\
+18 & BLT & 10010 & 3 \\
+19 & BGE & 10011 & 3 \\
+20 & JUMP & 10100 & 4 \\
+21 & LWD & 10101 & 5 \\
+22 & SWD & 10110 & 5 \\
+23 & LWI & 10111 & 6 \\
+24 & SWI & 11000 & 6 \\
+25 & EXIT & 11001 & 0 \\
+\bottomrule
+\end{longtable}
+
+% =====================================================================
+\section{Apendice B: Detalles Avanzados de Implementacion}
+% =====================================================================
+
+Detalles no documentados oficialmente, extraidos del RTL.
+
+\subsection{Multiplicacion Punto Fijo (FXPMUL)}
+
+\textbf{RTL:} \texttt{alu.sv}, lineas 152-159.
+
+Formato: \textbf{Q1.16.15} (1 bit signo, 16 bits enteros, 15 bits decimales).
+
+\begin{verbatim}
+localparam NBIT_DEC = 15;
+localparam NBIT_INT = 16;
+
+// mult_result_full es 64 bits
+// Se extrae bits [46:14] y luego [32:1]
+fxp_mult_result = mult_result_full[46:15];  // Efectivamente / 2^15
+\end{verbatim}
+
+\textbf{Interpretacion:} El resultado de $A \times B$ se desplaza 15 bits a 
+la derecha para mantener la escala Q1.16.15.
+
+\subsection{Desplazamientos (Shifts)}
+
+\textbf{RTL:} \texttt{alu.sv}, linea 199.
+
+\begin{itemize}
+    \item El \textbf{shift amount} usa solo los 5 bits LSB:
+    \begin{verbatim}
+shift_amt = operand_b_i[4:0]  // Solo bits [4:0]
+    \end{verbatim}
+    Valores $\geq 32$ se truncan modulo 32.
+    
+    \item \texttt{SLL} se implementa invirtiendo bits y usando el barrel 
+          shifter derecho.
+    
+    \item \texttt{SRA} extiende el bit de signo correctamente.
+\end{itemize}
+
+\subsection{Comparaciones Signed (BLT/BGE)}
+
+\textbf{RTL:} \texttt{alu.sv}, lineas 249-255.
+
+Las comparaciones manejan overflow correctamente:
+
+\begin{verbatim}
+if ((operand_a[31] ^ operand_b[31]) == 0)
+  // Mismos signos: usar signo del resultado
+  is_greater_equal = (adder_result[31] == 0);
+else
+  // Signos diferentes: A >= B si A es positivo
+  is_greater_equal = ~operand_a[31];
+\end{verbatim}
+
+\subsection{Bus de Memoria: Timing Asimetrico}
+
+\textbf{RTL:} \texttt{data\_bus\_handler.sv}, lineas 186-193.
+
+\begin{itemize}
+    \item \textbf{Store}: Puede completar en \textbf{1 ciclo} (single-phase).
+    \item \textbf{Load}: Minimo \textbf{2 ciclos} (address + data phase).
+\end{itemize}
+
+\subsection{Incremento de Punteros LWD/SWD}
+
+\textbf{RTL:} \texttt{data\_bus\_handler.sv}, lineas 62-66.
+
+El campo \texttt{IMM} de 13 bits es \textbf{sign-extended} a 32 bits:
+
+\begin{verbatim}
+rcs_add_inc_sign_ext = {{19{imm[12]}}, imm[12:0]};
+\end{verbatim}
+
+Esto permite \textbf{decrementar} el puntero usando valores negativos.
+
+\subsection{Escritura en Registros}
+
+\textbf{RTL:} \texttt{reg\_file.sv}, lineas 26-34.
+
+Escritura ocurre en flanco de reloj \textbf{siguiente}. Si escribes a R0 
+en ciclo $t$, el nuevo valor esta disponible en ciclo $t+1$.
+
+\subsection{Gestion de Latencia de Memoria (LWI/SWI)}
+
+\textbf{RTL:} \texttt{cgra\_rcs.sv}, lineas 117-217.
+
+\subsubsection{Arquitectura del Bus de Memoria}
+
+\begin{verbatim}
++-------------+    +-------------+    +-------------+    +-------------+
+|  Columna 0  |    |  Columna 1  |    |  Columna 2  |    |  Columna 3  |
++-------------+    +-------------+    +-------------+    +-------------+
+      |                  |                  |                  |
+      v                  v                  v                  v
++-------------+    +-------------+    +-------------+    +-------------+
+| Bus Indep.  |    | Bus Indep.  |    | Bus Indep.  |    | Bus Indep.  |
+|   Col 0     |    |   Col 1     |    |   Col 2     |    |   Col 3     |
++-------------+    +-------------+    +-------------+    +-------------+
+\end{verbatim}
+
+\textbf{Punto clave:} Cada columna tiene un bus \textbf{independiente}. 
+Las columnas 0-3 pueden hacer accesos a memoria \textbf{en paralelo}.
+
+\subsubsection{Arbitraje Dentro de una Columna}
+
+Dentro de una columna, las 4 RCs (filas 0-3) comparten un unico bus.
+El arbitraje usa \textbf{prioridad fija por fila}:
+
+\begin{verbatim}
+// cgra_rcs.sv lineas 128-138
+for (int k=0; k<N_ROW; k++) begin      // k = 0,1,2,3
+  if (data_req_gnt_mask[col][k] == 1'b1 && data_gnt == 1'b1) begin
+    gnt_demux[col][k] = 1'b1;
+    break;  // <-- PRIORIDAD: fila 0 primero, luego 1, 2, 3
+  end
+end
+\end{verbatim}
+
+\textbf{Implicacion:} Si RC(0,0), RC(1,0), RC(2,0) y RC(3,0) hacen LWI en 
+el mismo ciclo, se sirven en orden: fila 0, luego 1, luego 2, luego 3.
+
+\subsubsection{Escenarios de Latencia}
+
+\begin{table}[h]
+\centering
+\caption{Latencia de LWI segun configuracion}
+\begin{tabular}{p{6cm}cc}
+\toprule
+\textbf{Escenario} & \textbf{Ciclos} & \textbf{Explicacion} \\
+\midrule
+1 RC hace LWI & 2 & Address + Data \\
+4 RCs misma columna (misma o diferente dir) & 5 & Serializados \\
+4 RCs en 4 columnas diferentes & 2 & Paralelo \\
+Diagonal: RC(i,i) para i=0..3 & 2 & Paralelo \\
+\midrule
+\textbf{16 RCs, misma direccion} & \textbf{9} & 4 col $\times$ 2 + overhead \\
+\textbf{16 RCs, diferentes direcciones} & \textbf{9} & Igual (no hay cache) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Arquitectura del Bus TCDM}
+
+\textbf{RTL:} \texttt{cgra\_top.sv}, lineas 15-22.
+
+El CGRA se conecta a la memoria via \textbf{TCDM} (Tightly Coupled Data Memory)
+con \textbf{4 puertos master independientes}:
+
+\begin{verbatim}
+// cgra_top.sv - Puertos TCDM
+output logic [N_COL-1:0]             tcdm_req_o,      // 4 requests
+output logic [32-1:0]                tcdm_add_o [0:N_COL-1], // 4 dirs
+output logic [N_COL-1:0]             tcdm_wen_o,      // 4 wen
+output logic [32-1:0]                tcdm_wdata_o [0:N_COL-1],
+input  logic [N_COL-1:0]             tcdm_gnt_i,      // 4 grants
+input  logic [32-1:0]                tcdm_rdata_i [0:N_COL-1], // 4 datos
+input  logic [N_COL-1:0]             tcdm_r_valid_i   // 4 valids
+\end{verbatim}
+
+\textbf{Arquitectura fisica:}
+
+\begin{verbatim}
+                    MEMORIA TCDM (Multi-banco)
+                    ============================
+                    |   |   |   |   |   |   |   |
+                    v   v   v   v   v   v   v   v
+               +-----------------------------------------+
+               |        TCDM Interconnect/Arbiter        |
+               +-----------------------------------------+
+                    |           |          |          |
+                    v           v          v          v
+               +--------+  +--------+  +--------+  +--------+
+               | Puerto |  | Puerto |  | Puerto |  | Puerto |
+               |   0    |  |   1    |  |   2    |  |   3    |
+               +--------+  +--------+  +--------+  +--------+
+                    |           |          |          |
+               +--------+  +--------+  +--------+  +--------+
+               |  Col 0 |  |  Col 1 |  |  Col 2 |  |  Col 3 |
+               | 4 RCs  |  | 4 RCs  |  | 4 RCs  |  | 4 RCs  |
+               +--------+  +--------+  +--------+  +--------+
+\end{verbatim}
+
+\subsubsection{Caso: 16 RCs hacen LWI a la MISMA direccion}
+
+Cuando todos los 16 PEs hacen LWI a la misma direccion (ej: cargar una 
+constante global):
+
+\begin{enumerate}
+    \item Las 4 columnas emiten requests \textbf{en paralelo}
+    \item Cada columna serializa sus 4 filas (prioridad 0,1,2,3)
+    \item El TCDM puede responder en paralelo a las 4 columnas
+    \item \textbf{Todos reciben el mismo valor}, pero cada uno lo lee
+\end{enumerate}
+
+\begin{verbatim}
+Timeline (16 LWI a misma direccion 0x1000):
+
+Ciclo 0: Instruccion LWI emitida
+         Col0: Row0 pide, Col1: Row0 pide, Col2: Row0 pide, Col3: Row0 pide
+         
+Ciclo 1: TCDM responde a 4 columnas
+         Col0: Row0 recibe, Row1 pide
+         Col1: Row0 recibe, Row1 pide
+         Col2: Row0 recibe, Row1 pide
+         Col3: Row0 recibe, Row1 pide
+         
+Ciclo 2: Col0: Row1 recibe, Row2 pide ...
+...
+Ciclo 4: Col0: Row3 recibe (ultimo)
+         
+Total: ~5 ciclos (2 base + 3 serializacion por fila)
+\end{verbatim}
+
+\textbf{Nota importante:} La memoria no tiene optimizacion de broadcast. 
+Incluso si todos leen la misma direccion, cada uno hace su peticion.
+
+\subsubsection{Caso: 16 RCs hacen LWI a DIFERENTES direcciones}
+
+La latencia es la \textbf{misma} que para direcciones iguales:
+
+\begin{itemize}
+    \item El arbitraje es por columna, no por direccion
+    \item Cada columna serializa por fila independientemente
+    \item La TCDM puede servir las 4 columnas en paralelo
+    \item \textbf{Total: ~9 ciclos} (asumiendo respuesta TCDM en 1 ciclo)
+\end{itemize}
+
+\subsubsection{Calculo de Latencia Exacta}
+
+Para $N$ RCs haciendo LWI, donde $C$ columnas distintas y maximo $R$ filas 
+por columna:
+
+\[
+Latencia = 2 + (R_{max} - 1) \times 1
+\]
+
+donde $R_{max}$ es el maximo numero de filas activas en cualquier columna.
+
+\begin{table}[h]
+\centering
+\caption{Latencia segun distribucion de RCs}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Patron} & \textbf{N RCs} & \textbf{Columnas} & \textbf{Max filas/col} & \textbf{Ciclos} \\
+\midrule
+1 RC cualquiera & 1 & 1 & 1 & 2 \\
+1 fila completa & 4 & 4 & 1 & 2 \\
+1 columna completa & 4 & 1 & 4 & 5 \\
+2x2 esquina & 4 & 2 & 2 & 3 \\
+Diagonal 4x4 & 4 & 4 & 1 & 2 \\
+Todos (4x4) & 16 & 4 & 4 & 5 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Memoria Directa (LWD/SWD) vs Indirecta (LWI/SWI)}
+
+\textbf{RTL:} \texttt{data\_bus\_handler.sv}, lineas 86-112, 137-144.
+
+\subsubsection{Diferencia Fundamental}
+
+\begin{table}[h]
+\centering
+\caption{Comparacion LWD vs LWI}
+\begin{tabular}{p{3cm}cc}
+\toprule
+\textbf{Caracteristica} & \textbf{LWD} & \textbf{LWI} \\
+\midrule
+Flag data\_ind & 0 & 1 \\
+Fuente direccion & Puntero de columna & RC calcula \\
+Puntero & 1 por columna & N/A \\
+Auto-incremento & Si & No \\
+Uso tipico & Streaming & Scatter/Gather \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Punteros por Columna (LWD/SWD)}
+
+\textbf{Punto critico:} Cada columna tiene \textbf{UN unico puntero de 
+lectura} y \textbf{UN unico puntero de escritura}.
+
+\begin{verbatim}
+// data_bus_handler.sv
+logic [32-1:0] rd_data_cnt_col [0:N_COL-1]; // 4 punteros R
+logic [32-1:0] wr_data_cnt_col [0:N_COL-1]; // 4 punteros W
+
+// Seleccion de direccion:
+if (data_ind == 1'b1)            // LWI
+  bus_add = rcs_data_add_i[col]; // Direccion de la RC
+else                              // LWD
+  if (wen == 1'b1)               // Read
+    bus_add = rd_data_cnt_col[col]; // Puntero columna
+  else                            // Write
+    bus_add = wr_data_cnt_col[col];
+\end{verbatim}
+
+\subsubsection{Comportamiento con Multiples RCs}
+
+\textbf{Escenario:} 4 RCs de la columna 0 ejecutan LWD en el mismo ciclo.
+
+\begin{verbatim}
+Ciclo 0: Las 4 RCs emiten LWD
+         El puntero rd_data_cnt_col[0] = 0x1000
+         TODAS usan la MISMA direccion 0x1000!
+         
+Ciclo 1: Row0 recibe dato de 0x1000
+         rd_data_cnt_col[0] += IMM (ej: +4 = 0x1004)
+         Row1 ahora pide, usa 0x1004
+         
+Ciclo 2: Row1 recibe dato de 0x1004
+         rd_data_cnt_col[0] += 4 = 0x1008
+         Row2 pide, usa 0x1008
+         
+...etc
+\end{verbatim}
+
+\textbf{Resultado:} Las 4 RCs reciben valores \textbf{consecutivos} 
+(0x1000, 0x1004, 0x1008, 0x100C), no el mismo valor.
+
+\subsubsection{Latencia LWD con Streaming}
+
+\begin{table}[h]
+\centering
+\caption{Latencia LWD vs LWI}
+\begin{tabular}{p{4.5cm}ccc}
+\toprule
+\textbf{Escenario} & \textbf{LWI} & \textbf{LWD} & \textbf{Notas} \\
+\midrule
+1 RC & 2 & 2 & Igual \\
+4 RCs misma columna & 5 & 5 & Serializado \\
+4 RCs, 4 columnas & 2 & 2 & Paralelo \\
+16 RCs & 5 & 5 & 4 col paralelas \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{La latencia es igual}, pero LWD automaticamente incrementa el 
+puntero para la siguiente lectura (streaming).
+
+\subsubsection{Cuando usar LWD vs LWI}
+
+\begin{itemize}
+    \item \textbf{LWD}: Datos secuenciales (arrays, streaming). Una RC 
+          por columna lee secuencialmente.
+    \item \textbf{LWI}: Acceso aleatorio, indices calculados, o cuando 
+          multiples RCs necesitan leer la MISMA direccion.
+\end{itemize}
+
+\textbf{Advertencia:} Si 4 RCs de una columna hacen LWD, cada una lee un 
+valor DIFERENTE (el puntero avanza). Para leer el MISMO valor en todas 
+las RCs de una columna, usa LWI con la misma direccion (pero serializado).
+
+\subsubsection{Dato Compartido en Columna}
+
+\textbf{RTL:} \texttt{cgra\_rcs.sv}, lineas 406-407.
+
+\begin{verbatim}
+.data_rdata_i  (     data_rdata_i     [j  ] ),  // Compartido
+.data_rvalid_i (     rvalid_demux[j  ][i  ] ),  // Demultiplexado
+\end{verbatim}
+
+\textbf{Importante:} El dato leido (\texttt{data\_rdata\_i}) es \textbf{broadcast} 
+a todas las RCs de la columna, pero solo la RC que pidio recibe 
+\texttt{rvalid=1} para capturarlo.
+
+Esto significa que si todas las RCs de una columna quieren leer la 
+\textbf{misma direccion}, podrian optimizarse en hardware (pero el RTL 
+actual no lo hace -- cada una debe esperar su turno).
+
+\subsubsection{Stall y Sincronizacion Multi-Columna}
+
+\textbf{RTL:} \texttt{cgra\_rcs.sv}, lineas 91-103.
+
+\begin{verbatim}
+// Stall por RC se propaga a toda la columna
+for (int k=0; k<N_ROW; k++) begin
+  rc_stall_col[l] |= rcs_stall_s[k][l];  // OR de todas las filas
+end
+
+// Para kernels multi-columna, los stalls se combinan
+rc_stall_comb[l] = |(rc_stall_col & col_acc_map_i[l]);
+\end{verbatim}
+
+\textbf{Implicacion para kernels multi-columna:}
+\begin{itemize}
+    \item Si columnas 0 y 1 estan en el mismo kernel, y columna 0 hace LWI, 
+          \textbf{ambas columnas se detienen}.
+    \item Esto mantiene la sincronizacion del PC compartido.
+\end{itemize}
+
+\subsubsection{Estrategias de Optimizacion}
+
+\begin{enumerate}
+    \item \textbf{Distribuir cargas por columna}: Si necesitas 4 valores, 
+          usarlos en RC(x,0), RC(x,1), RC(x,2), RC(x,3) permite cargas 
+          paralelas.
+    
+    \item \textbf{Evitar multiples LWI por columna}: Si todas las RCs de 
+          una columna hacen LWI, la latencia es $2 \times N_{RCs}$ ciclos.
+    
+    \item \textbf{Solapar con computo}: Mientras una RC espera datos, otras 
+          columnas pueden seguir ejecutando (si no es kernel multi-columna).
+    
+    \item \textbf{Patron diagonal}: RC(0,0), RC(1,1), RC(2,2), RC(3,3) 
+          pueden cargar en paralelo (4 columnas distintas).
+\end{enumerate}
+
+% =====================================================================
+\section{Apendice C: Discrepancias con Documentacion Antigua}
+% =====================================================================
+
+\begin{table}[h]
+\centering
+\caption{Correcciones respecto al PDF original}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Item} & \textbf{PDF Antiguo} & \textbf{RTL (correcto)} \\
+\midrule
+Opcode LWD & 27 & \textbf{21} \\
+Opcode SWD & 28 & \textbf{22} \\
+Opcode LWI & 29 & \textbf{23} \\
+Opcode SWI & 30 & \textbf{24} \\
+MUXF[0] nombre & PREV & PREV (own\_flag\_i) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% =====================================================================
+\section*{Historial de Revisiones}
+% =====================================================================
+
+\begin{tabular}{llp{7cm}}
+\toprule
+\textbf{Fecha} & \textbf{Version} & \textbf{Cambios} \\
+\midrule
+2024-12 & 2.0.1 & Verificacion completa contra RTL. Correccion de 
+                  opcodes de memoria. Documentacion de stalls, flags, 
+                  y semantica de BSFA/BZFA. \\
+\bottomrule
+\end{tabular}
+
+\end{document}

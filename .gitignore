@@ -20,3 +20,4 @@ sw/external/drivers/cgra/cgra.h
 *.vscode*
 *vivado*
 *__pycache__*
+personal/codes/*
