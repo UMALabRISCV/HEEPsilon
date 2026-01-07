@@ -52,5 +52,6 @@ jobs:
           
       - name: Check for uncommitted changes
         run: |
+          . ./.venv/bin/activate
           hw/vendor/esl_epfl_x_heep/util/git-diff.py \
             --error-msg "::error ::Generated files differ from repository. Run 'make mcu-gen' and commit."
