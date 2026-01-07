@@ -30,7 +30,7 @@ jobs:
           python-version: "3.9"
           
       - name: Install requirements
-        run: pip install -r hw/vendor/esl_epfl_x_heep/python-requirements.txt
+        run: pip install -r hw/vendor/esl_epfl_x_heep/util/python-requirements.txt
         
       - name: Re-vendor and diff
         run: |
@@ -57,7 +57,7 @@ jobs:
         run: |
           make venv
           . ./.venv/bin/activate
-          pip install -r hw/vendor/esl_epfl_x_heep/python-requirements.txt
+          pip install -r hw/vendor/esl_epfl_x_heep/util/python-requirements.txt
           
       - name: Install Verible
         run: |
