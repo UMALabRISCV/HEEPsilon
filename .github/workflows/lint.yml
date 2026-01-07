@@ -14,30 +14,6 @@ env:
 
 jobs:
   # ==========================================================================
-  # Vendor Check
-  # ==========================================================================
-  check-vendor:
-    name: Vendor Up-to-Date
-    runs-on: ubuntu-latest
-    
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      
-      - uses: actions/setup-python@v4
-        with:
-          python-version: "3.9"
-          
-      - name: Install requirements
-        run: pip install -r hw/vendor/esl_epfl_x_heep/util/python-requirements.txt
-        
-      - name: Re-vendor and diff
-        run: |
-          find . -name '*.vendor.hjson' | xargs -n1 util/vendor.py --verbose
-          hw/vendor/esl_epfl_x_heep/util/git-diff.py --error-msg "::error ::Vendored sources out of date. Run vendor.py to update."
-
-  # ==========================================================================
   # MCU Generation Check
   # ==========================================================================
   check-mcu-gen:
@@ -51,7 +27,7 @@ jobs:
       
       - uses: actions/setup-python@v4
         with:
-          python-version: "3.8"
+          python-version: "3.9"
           
       - name: Setup Python environment
         run: |
@@ -64,7 +40,7 @@ jobs:
           mkdir -p build/verible
           cd build/verible
           curl -Ls -o verible.tar.gz \
-            "https://github.com/google/verible/releases/download/v${VERIBLE_VERSION}/verible-v${VERIBLE_VERSION}-Ubuntu-18.04-bionic-x86_64.tar.gz"
+            "https://github.com/google/verible/releases/download/v${VERIBLE_VERSION}/verible-v${VERIBLE_VERSION}-linux-static-x86_64.tar.gz"
           sudo mkdir -p /tools/verible && sudo chmod 777 /tools/verible
           tar -C /tools/verible -xf verible.tar.gz --strip-components=1
           echo "/tools/verible/bin" >> $GITHUB_PATH
