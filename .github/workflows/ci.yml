@@ -79,7 +79,7 @@ jobs:
             -v ${{ github.workspace }}:/workspace/heepsilon \
             -w /workspace/heepsilon \
             ${{ env.DOCKER_IMAGE }} \
-            bash -c "make mcu-gen && make verilator-sim"
+            bash -c "make mcu-gen MEMORY_BANKS=8 && make verilator-sim"
 
       - name: Build all test applications
         run: |
