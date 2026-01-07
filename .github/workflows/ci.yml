@@ -5,7 +5,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-name: CI
+name: 🏗️ Full Simulation CI (Docker)
 
 on:
   push:
