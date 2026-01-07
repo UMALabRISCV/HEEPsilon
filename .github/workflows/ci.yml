@@ -87,15 +87,19 @@ jobs:
             -v ${{ github.workspace }}:/workspace/heepsilon \
             -w /workspace/heepsilon \
             ${{ env.DOCKER_IMAGE }} \
-            bash -c "
-              for app in hello_world cgra_func_test cgra_simple_add cgra_load_store_test cgra_dbl_search cgra_fft cgra_pmean cgra_check_conf; do
-                echo '=== Building \$app ==='
-                make app PROJECT=\$app
-                mkdir -p sw/build/\$app
-                cp sw/build/main.hex sw/build/\$app/
-                cp sw/build/main.elf sw/build/\$app/ 2>/dev/null || true
-              done
-            "
+            bash -c 'for app in hello_world cgra_func_test cgra_simple_add cgra_load_store_test cgra_dbl_search cgra_fft cgra_pmean cgra_check_conf; do echo "=== Building $app ==="; make app PROJECT=$app; mkdir -p sw/build/$app; cp sw/build/main.hex sw/build/$app/; done'
+      
+      - name: Verify builds
+        run: |
+          echo "=== Contents of sw/build ==="
+          ls -la sw/build/
+          for app in hello_world cgra_func_test cgra_simple_add; do
+            if [ -f "sw/build/$app/main.hex" ]; then
+              echo "✅ $app built successfully"
+            else
+              echo "❌ $app missing"
+            fi
+          done
 
       - name: Upload Verilator simulator
         uses: actions/upload-artifact@v4
@@ -133,19 +137,21 @@ jobs:
           name: app-binaries
           path: apps/
 
-      - name: Debug files
-        run: find . -maxdepth 4 -not -path '*/.*'
+      - name: Debug downloaded files
+        run: |
+          echo "=== Apps directory ==="
+          ls -la apps/
+          echo "=== hello_world directory ==="
+          ls -la apps/hello_world/ || echo "hello_world dir not found"
 
       - name: Run hello_world simulation
         run: |
           chmod +x sim/Vtestharness
           
-          # Copy firmware to simulation directory to be safe
+          # Copy firmware to simulation directory
           cp apps/hello_world/main.hex sim/firmware.hex
           
           cd sim
-          # Use local relative path
-          # For hello_world a short timeout is fine
           ./Vtestharness +firmware=firmware.hex +max_sim_time=100000
 
       - name: Verify output
@@ -208,11 +214,7 @@ jobs:
           cp apps/${{ matrix.app }}/main.hex sim/firmware.hex
           
           cd sim
-          # Clean previous logs
           rm -f uart0.log
-          
-          # Use local relative path
-          # Removed +max_sim_time to avoid cutting tests short
           ./Vtestharness +firmware=firmware.hex || true
 
       - name: Verify output
