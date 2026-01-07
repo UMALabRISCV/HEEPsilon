@@ -131,11 +131,18 @@ jobs:
           name: app-binaries
           path: apps/
 
+      - name: Debug files
+        run: find . -maxdepth 4 -not -path '*/.*'
+
       - name: Run hello_world simulation
         run: |
           chmod +x sim/Vtestharness
+          # Use absolute path for firmware
+          FIRMWARE=$(pwd)/apps/hello_world/main.hex
+          echo "Using firmware: $FIRMWARE"
+
           cd sim
-          ./Vtestharness +firmware=../apps/hello_world/main.hex
+          ./Vtestharness +firmware="$FIRMWARE"
 
       - name: Verify output
         run: |
@@ -191,10 +198,14 @@ jobs:
       - name: Run ${{ matrix.app }}
         run: |
           chmod +x sim/Vtestharness
+          # Use absolute path for firmware
+          FIRMWARE=$(pwd)/apps/${{ matrix.app }}/main.hex
+          echo "Using firmware: $FIRMWARE"
+          
           cd sim
           # Clean previous logs
           rm -f uart0.log
-          ./Vtestharness +firmware=../apps/${{ matrix.app }}/main.hex || true
+          ./Vtestharness +firmware="$FIRMWARE" || true
 
       - name: Verify output
         run: |
