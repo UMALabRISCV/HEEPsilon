@@ -62,6 +62,25 @@ RUN cd /tmp && \
 RUN verilator --version
 
 # =============================================================================
+# Verible Installation
+# =============================================================================
+# Required by mcu-gen for formatting generated SystemVerilog files
+
+ARG VERIBLE_VERSION=0.0-3644-g6882622d
+
+RUN cd /tmp && \
+    curl -Ls -o verible.tar.gz \
+    "https://github.com/chipsalliance/verible/releases/download/v${VERIBLE_VERSION}/verible-v${VERIBLE_VERSION}-linux-static-x86_64.tar.gz" && \
+    mkdir -p /opt/verible && \
+    tar -C /opt/verible -xf verible.tar.gz --strip-components=1 && \
+    rm verible.tar.gz
+
+ENV PATH="/opt/verible/bin:${PATH}"
+
+# Verify installation
+RUN verible-verilog-format --version
+
+# =============================================================================
 # HEEPsilon Environment Setup
 # =============================================================================
 
