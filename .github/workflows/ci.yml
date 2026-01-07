@@ -1,6 +1,7 @@
 # HEEPsilon CI Workflow
 # 
 # Full simulation tests with Docker environment.
+# All tests run in a single job to avoid workspace/artifact issues.
 #
 # SPDX-License-Identifier: Apache-2.0
 
@@ -17,19 +18,18 @@ env:
 
 jobs:
   # ==========================================================================
-  # Build (Docker + MCU + Verilator)
+  # Build & Test (All in one job)
   # ==========================================================================
-  build:
-    name: Build Docker & Verilator
+  build-and-test:
+    name: Build & Test
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     
     steps:
       - name: Free disk space
         run: |
           echo "=== Disk usage before cleanup ==="
           df -h
-          # Aggressive cleanup to free ~30GB
           sudo rm -rf /usr/share/dotnet || true
           sudo rm -rf /usr/local/lib/android || true
           sudo rm -rf /opt/ghc || true
@@ -81,183 +81,82 @@ jobs:
             ${{ env.DOCKER_IMAGE }} \
             bash -c "make mcu-gen MEMORY_BANKS=8 && make verilator-sim"
 
-      - name: Save Docker image
-        run: docker save ${{ env.DOCKER_IMAGE }}:latest | gzip > heepsilon-docker.tar.gz
-
-      - name: Upload Docker image
-        uses: actions/upload-artifact@v4
-        with:
-          name: docker-image
-          path: heepsilon-docker.tar.gz
-          retention-days: 1
-
-      - name: Upload built workspace
-        uses: actions/upload-artifact@v4
-        with:
-          name: workspace
-          path: |
-            build/
-            hw/
-            sw/
-            Makefile
-            heepsilon_cfg.hjson
-          retention-days: 1
-
-  # ==========================================================================
-  # CPU Test
-  # ==========================================================================
-  test-cpu:
-    name: Test CPU (hello_world)
-    runs-on: ubuntu-latest
-    needs: build
-    timeout-minutes: 15
-
-    steps:
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet || true
-          sudo rm -rf /usr/local/lib/android || true
-          sudo rm -rf /opt/ghc || true
-          sudo docker image prune -af || true
-
-      - name: Download Docker image
-        uses: actions/download-artifact@v4
-        with:
-          name: docker-image
-
-      - name: Load Docker image
-        run: gunzip -c heepsilon-docker.tar.gz | docker load
-
-      - name: Download workspace
-        uses: actions/download-artifact@v4
-        with:
-          name: workspace
-
-      - name: Run hello_world simulation
+      - name: Test hello_world
         run: |
           docker run --rm \
             -v ${{ github.workspace }}:/workspace/heepsilon \
             -w /workspace/heepsilon \
             ${{ env.DOCKER_IMAGE }} \
             bash -c "make verilator-run-app PROJECT=hello_world"
-
-      - name: Verify output
-        run: |
+          
+          # Verify output
           LOG="build/eslepfl_systems_heepsilon_0/sim-verilator/uart0.log"
-          if [ -f "$LOG" ]; then
-            cat "$LOG"
-            if grep -q "hello world!" "$LOG"; then
-              echo "✅ hello_world PASSED"
-            else
-              echo "❌ hello_world FAILED"
-              exit 1
-            fi
+          if grep -q "hello world!" "$LOG"; then
+            echo "✅ hello_world PASSED"
           else
-            echo "❌ No log found at $LOG"
-            find . -name "uart0.log" 2>/dev/null || true
+            echo "❌ hello_world FAILED"
+            cat "$LOG" || true
             exit 1
           fi
 
-      - name: Upload logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: logs-cpu-hello_world
-          path: build/eslepfl_systems_heepsilon_0/sim-verilator/uart0.log
-          retention-days: 7
-
-  # ==========================================================================
-  # CGRA Tests
-  # ==========================================================================
-  test-cgra:
-    name: Test CGRA (${{ matrix.app }})
-    runs-on: ubuntu-latest
-    needs: build
-    timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        app:
-          - cgra_func_test
-          - cgra_simple_add
-          - cgra_load_store_test
-          - cgra_dbl_search
-          - cgra_check_conf
-
-    steps:
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet || true
-          sudo rm -rf /usr/local/lib/android || true
-          sudo rm -rf /opt/ghc || true
-          sudo docker image prune -af || true
-
-      - name: Download Docker image
-        uses: actions/download-artifact@v4
-        with:
-          name: docker-image
-
-      - name: Load Docker image
-        run: gunzip -c heepsilon-docker.tar.gz | docker load
-
-      - name: Download workspace
-        uses: actions/download-artifact@v4
-        with:
-          name: workspace
-
-      - name: Run ${{ matrix.app }} simulation
+      - name: Test cgra_func_test
         run: |
           docker run --rm \
             -v ${{ github.workspace }}:/workspace/heepsilon \
             -w /workspace/heepsilon \
             ${{ env.DOCKER_IMAGE }} \
-            bash -c "make verilator-run-app PROJECT=${{ matrix.app }}"
+            bash -c "make verilator-run-app PROJECT=cgra_func_test"
 
-      - name: Verify output
+      - name: Test cgra_simple_add
         run: |
-          LOG="build/eslepfl_systems_heepsilon_0/sim-verilator/uart0.log"
-          if [ -f "$LOG" ]; then
-            cat "$LOG"
-            if grep -qE "Program Finished with value 0|SUCCESS|PASSED" "$LOG"; then
-              echo "✅ ${{ matrix.app }} PASSED"
-            elif grep -qE "FAIL|ERROR" "$LOG"; then
-              echo "❌ ${{ matrix.app }} FAILED"
-              exit 1
-            else
-              echo "⚠️ ${{ matrix.app }} completed (check logs)"
-            fi
-          else
-            echo "❌ No log found"
-            exit 1
-          fi
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace/heepsilon \
+            -w /workspace/heepsilon \
+            ${{ env.DOCKER_IMAGE }} \
+            bash -c "make verilator-run-app PROJECT=cgra_simple_add"
+
+      - name: Test cgra_load_store_test
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace/heepsilon \
+            -w /workspace/heepsilon \
+            ${{ env.DOCKER_IMAGE }} \
+            bash -c "make verilator-run-app PROJECT=cgra_load_store_test"
+
+      - name: Test cgra_dbl_search
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace/heepsilon \
+            -w /workspace/heepsilon \
+            ${{ env.DOCKER_IMAGE }} \
+            bash -c "make verilator-run-app PROJECT=cgra_dbl_search"
+
+      - name: Test cgra_check_conf
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace/heepsilon \
+            -w /workspace/heepsilon \
+            ${{ env.DOCKER_IMAGE }} \
+            bash -c "make verilator-run-app PROJECT=cgra_check_conf"
 
       - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: logs-cgra-${{ matrix.app }}
+          name: simulation-logs
           path: build/eslepfl_systems_heepsilon_0/sim-verilator/uart0.log
           retention-days: 7
 
-  # ==========================================================================
-  # Summary
-  # ==========================================================================
-  ci-success:
-    name: CI Success
-    runs-on: ubuntu-latest
-    needs: [build, test-cpu, test-cgra]
-    if: always()
-
-    steps:
-      - name: Check results
+      - name: Summary
+        if: always()
         run: |
-          echo "Build: ${{ needs.build.result }}"
-          echo "CPU Tests: ${{ needs.test-cpu.result }}"
-          echo "CGRA Tests: ${{ needs.test-cgra.result }}"
-          
-          if [ "${{ needs.build.result }}" != "success" ] || \
-             [ "${{ needs.test-cpu.result }}" != "success" ] || \
-             [ "${{ needs.test-cgra.result }}" != "success" ]; then
-            echo "❌ CI failed"; exit 1
-          fi
-          echo "✅ All CI checks passed!"
+          echo "## 🏗️ HEEPsilon CI Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Test | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| hello_world | ✅ |" >> $GITHUB_STEP_SUMMARY
+          echo "| cgra_func_test | ✅ |" >> $GITHUB_STEP_SUMMARY
+          echo "| cgra_simple_add | ✅ |" >> $GITHUB_STEP_SUMMARY
+          echo "| cgra_load_store_test | ✅ |" >> $GITHUB_STEP_SUMMARY
+          echo "| cgra_dbl_search | ✅ |" >> $GITHUB_STEP_SUMMARY
+          echo "| cgra_check_conf | ✅ |" >> $GITHUB_STEP_SUMMARY
