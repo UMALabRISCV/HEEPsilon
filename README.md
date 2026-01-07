@@ -167,21 +167,64 @@ cat uart0.log
 
 ## Clock Configuration (CPU/CGRA)
 
-HEEPsilon currently runs the CPU and CGRA from the same system clock. You can adjust it from a single place:
+HEEPsilon runs the CPU and CGRA from the same system clock. The default frequency is **100 MHz**.
 
-1. Edit `clock_config.mk` and set `HEEPSILON_CPU_CLK_HZ` (and optionally `HEEPSILON_CGRA_CLK_HZ`).
-2. Run `make clock-gen` (or any target that depends on it, e.g. `make mcu-gen` or `make app`).
+### Quick Frequency Change
 
-This regenerates:
-- `tb/heepsilon_clock_config.svh` and `tb/heepsilon_clock_config.hh` for simulation (SV + Verilator)
-- `sw/device/heepsilon_clock_config.h` for software (`REFERENCE_CLOCK_Hz`)
+Use the automated targets to change frequency:
 
-Example:
 ```bash
-make clock-gen HEEPSILON_CPU_CLK_HZ=50000000 HEEPSILON_CGRA_CLK_HZ=50000000
+# View current frequency configuration
+make clock-show
+
+# Change to 50 MHz (updates config and cleans build)
+make set-freq FREQ=50000000
+
+# Change frequency AND rebuild Verilator in one step
+make verilator-set-freq FREQ=50000000
+
+# Verify the frequency is correctly applied
+make freq-verify
 ```
 
-> For FPGA targets, ensure the clock wizard output matches the same frequency (see `hw/fpga_cgra/scripts/*/xilinx_generate_clk_wizard.tcl`).
+### Manual Configuration
+
+For more control, you can manually edit `clock_config.mk`:
+
+```makefile
+HEEPSILON_CPU_CLK_HZ ?= 50000000
+HEEPSILON_CGRA_CLK_HZ ?= $(HEEPSILON_CPU_CLK_HZ)
+```
+
+Then rebuild:
+```bash
+rm -rf build                    # Required: frequency is baked into RTL
+make verilator-build            # Rebuild simulation model
+make verilator-run-app PROJECT=freq_check  # Verify
+```
+
+### How It Works
+
+Changing the frequency regenerates these files:
+- `tb/heepsilon_clock_config.svh` — SystemVerilog defines for testbench
+- `tb/heepsilon_clock_config.hh` — C++ defines for Verilator driver
+- `sw/device/heepsilon_clock_config.h` — C defines for firmware (`REFERENCE_CLOCK_Hz`)
+
+The testbench (`tb/testharness.sv`) reads `HEEPSILON_CPU_CLK_KHZ` to configure:
+- Clock period for simulation timing
+- UART baudrate calculation (so output remains readable at any frequency)
+
+> **Important**: Changing frequency requires a **full rebuild** (`rm -rf build`) because values are elaborated into the RTL at compile time.
+
+### Verified Frequencies
+
+| Frequency | Status | Notes |
+|-----------|--------|-------|
+| 50 MHz | ✅ Tested | CGRA kernels work correctly |
+| 100 MHz | ✅ Tested | Default configuration |
+| 250 MHz | ✅ Tested | High-performance mode |
+
+> For FPGA targets, ensure the Vivado clock wizard output matches the configured frequency (see `hw/fpga_cgra/scripts/*/xilinx_generate_clk_wizard.tcl`).
 
 ---
 

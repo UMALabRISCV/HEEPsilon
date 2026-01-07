@@ -5,13 +5,15 @@
 // HEEPsilon testharness - ported from x-heep testharness for proper simulation
 // This version uses heepsilon_top which wraps x_heep_system + CGRA integration
 
+`include "heepsilon_clock_config.svh"
+
 module testharness #(
     parameter bit COREV_PULP                  = 0,
     parameter bit FPU                         = 0,
     parameter bit ZFINX                       = 1,
     parameter bit X_EXT                       = 0,
     parameter     JTAG_DPI                    = 0,
-    parameter     CLK_FREQUENCY               = 'd100_000  //KHz
+    parameter     CLK_FREQUENCY               = `HEEPSILON_CPU_CLK_KHZ  //KHz from clock_config.mk
 ) (
 `ifdef VERILATOR
     input  wire         clk_i,

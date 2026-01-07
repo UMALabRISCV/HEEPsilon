@@ -169,7 +169,58 @@ link_build:
 	ln -sf ../hw/vendor/esl_epfl_x_heep/sw/build sw/build
 
 link_rm:
-	rm sw/build
+	rm -f sw/build
 
 clean:
 	rm -rf build buildsim.log
+
+## @section Clock Configuration
+
+## Show current clock configuration
+clock-show:
+	@echo "Current clock configuration:"
+	@echo "  CPU Clock:  $(HEEPSILON_CPU_CLK_HZ) Hz ($(HEEPSILON_CPU_CLK_KHZ) kHz)"
+	@echo "  CGRA Clock: $(HEEPSILON_CGRA_CLK_HZ) Hz ($(HEEPSILON_CGRA_CLK_KHZ) kHz)"
+	@echo ""
+	@echo "To change frequency, use:"
+	@echo "  make set-freq FREQ=50000000    # Set to 50MHz"
+	@echo "  make set-freq FREQ=100000000   # Set to 100MHz"
+
+## Change clock frequency and rebuild simulation model
+## @param FREQ=<frequency_in_hz> (e.g., FREQ=50000000 for 50MHz)
+.PHONY: set-freq
+set-freq:
+ifndef FREQ
+	$(error FREQ is not set. Usage: make set-freq FREQ=50000000)
+endif
+	@echo "Setting clock frequency to $(FREQ) Hz..."
+	@echo "# HEEPsilon clock configuration (Hz)." > clock_config.mk
+	@echo "# Edit this file or override variables on the make command line." >> clock_config.mk
+	@echo "# CPU and CGRA share the same system clock in the current design; keep them equal." >> clock_config.mk
+	@echo "# Use values divisible by 1000 (simulation uses kHz internally)." >> clock_config.mk
+	@echo "HEEPSILON_CPU_CLK_HZ ?= $(FREQ)" >> clock_config.mk
+	@echo 'HEEPSILON_CGRA_CLK_HZ ?= $$(HEEPSILON_CPU_CLK_HZ)' >> clock_config.mk
+	@echo ""
+	@echo "Cleaning build directory..."
+	rm -rf build
+	@echo "Regenerating clock configuration files..."
+	$(MAKE) clock-gen HEEPSILON_CPU_CLK_HZ=$(FREQ)
+	@echo ""
+	@echo "Frequency updated to $(FREQ) Hz! Now run:"
+	@echo "  make verilator-build   # Rebuild simulation model"
+	@echo "  make verilator-run-app PROJECT=freq_check  # Verify frequency"
+
+## Change frequency and rebuild Verilator model in one step
+## @param FREQ=<frequency_in_hz> (e.g., FREQ=50000000 for 50MHz)
+.PHONY: verilator-set-freq
+verilator-set-freq: set-freq verilator-build
+	@echo ""
+	@echo "Verilator model rebuilt with $(FREQ) Hz clock"
+
+## Verify current frequency configuration with freq_check application
+.PHONY: freq-verify
+freq-verify:
+	@rm -rf hw/vendor/esl_epfl_x_heep/sw/build
+	@rm -f sw/build
+	$(MAKE) verilator-run-app PROJECT=freq_check
+

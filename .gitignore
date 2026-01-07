@@ -17,6 +17,9 @@ hw/rtl/heepsilon_pkg.sv
 tb/tb_util.svh
 sw/external/drivers/cgra/cgra.h
 
+# Generated files from x-heep mcu-gen (missing from vendor .gitignore)
+hw/vendor/esl_epfl_x_heep/hw/core-v-mini-mcu/core_v_mini_mcu.sv
+
 *.vscode*
 *vivado*
 *__pycache__*
