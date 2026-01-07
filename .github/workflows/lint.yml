@@ -40,7 +40,7 @@ jobs:
           mkdir -p build/verible
           cd build/verible
           curl -Ls -o verible.tar.gz \
-            "https://github.com/google/verible/releases/download/v${VERIBLE_VERSION}/verible-v${VERIBLE_VERSION}-linux-static-x86_64.tar.gz"
+            "https://github.com/chipsalliance/verible/releases/download/v${VERIBLE_VERSION}/verible-v${VERIBLE_VERSION}-Ubuntu-20.04-focal-x86_64.tar.gz"
           sudo mkdir -p /tools/verible && sudo chmod 777 /tools/verible
           tar -C /tools/verible -xf verible.tar.gz --strip-components=1
           echo "/tools/verible/bin" >> $GITHUB_PATH
