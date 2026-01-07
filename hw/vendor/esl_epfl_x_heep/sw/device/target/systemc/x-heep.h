@@ -12,7 +12,11 @@ extern "C" {
 #endif  // __cplusplus
 
 
-#define REFERENCE_CLOCK_Hz 100*1000*1000
+#include "heepsilon_clock_config.h"
+
+#ifndef REFERENCE_CLOCK_Hz
+#define REFERENCE_CLOCK_Hz HEEPSILON_CPU_CLK_HZ
+#endif
 #define UART_BAUDRATE 256000
 // Calculation formula: NCO = 16 * 2^nco_width * baud / fclk.
 // NCO creates 16x of baudrate. So, in addition to the nco_width,

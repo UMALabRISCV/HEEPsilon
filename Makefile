@@ -5,7 +5,7 @@
 
 # Makefile to generates heepsilon files and build the design with fusesoc
 
-.PHONY: clean help
+.PHONY: clean help clock-gen
 
 TARGET 		?= sim
 FPGA_BOARD 	?= pynq-z2
@@ -17,6 +17,11 @@ PROJECT ?= hello_world
 
 #MEMORY_BANKS ?= 2 # Multiple of 2
 #MEMORY_BANKS_IL ?= 4 # Power of 2
+
+include clock_config.mk
+
+HEEPSILON_CPU_CLK_KHZ := $(shell expr $(HEEPSILON_CPU_CLK_HZ) / 1000)
+HEEPSILON_CGRA_CLK_KHZ := $(shell expr $(HEEPSILON_CGRA_CLK_HZ) / 1000)
   
 export HEEP_DIR = hw/vendor/esl_epfl_x_heep/
 include $(HEEP_DIR)Makefile.venv
@@ -34,7 +39,13 @@ endif
 
 HEEPSILON_CFG  ?= heepsilon_cfg.hjson
 
-heepsilon-gen:
+clock-gen:
+	@mkdir -p tb sw/device
+	@printf '`ifndef HEEPSILON_CLOCK_CONFIG_SVH\n`define HEEPSILON_CLOCK_CONFIG_SVH\n`define HEEPSILON_CPU_CLK_HZ $(HEEPSILON_CPU_CLK_HZ)\n`define HEEPSILON_CPU_CLK_KHZ $(HEEPSILON_CPU_CLK_KHZ)\n`define HEEPSILON_CGRA_CLK_HZ $(HEEPSILON_CGRA_CLK_HZ)\n`define HEEPSILON_CGRA_CLK_KHZ $(HEEPSILON_CGRA_CLK_KHZ)\n`endif\n' > tb/heepsilon_clock_config.svh
+	@printf '#ifndef HEEPSILON_CLOCK_CONFIG_HH\n#define HEEPSILON_CLOCK_CONFIG_HH\n#define HEEPSILON_CPU_CLK_HZ $(HEEPSILON_CPU_CLK_HZ)\n#define HEEPSILON_CPU_CLK_KHZ $(HEEPSILON_CPU_CLK_KHZ)\n#define HEEPSILON_CGRA_CLK_HZ $(HEEPSILON_CGRA_CLK_HZ)\n#define HEEPSILON_CGRA_CLK_KHZ $(HEEPSILON_CGRA_CLK_KHZ)\n#endif\n' > tb/heepsilon_clock_config.hh
+	@printf '#ifndef HEEPSILON_CLOCK_CONFIG_H\n#define HEEPSILON_CLOCK_CONFIG_H\n#define HEEPSILON_CPU_CLK_HZ $(HEEPSILON_CPU_CLK_HZ)\n#define HEEPSILON_CGRA_CLK_HZ $(HEEPSILON_CGRA_CLK_HZ)\n#endif\n' > sw/device/heepsilon_clock_config.h
+
+heepsilon-gen: clock-gen
 	$(PYTHON) util/heepsilon_gen.py --cfg $(HEEPSILON_CFG) --outdir hw/vendor/esl_epfl_cgra/hw/rtl --pkg-sv hw/vendor/esl_epfl_cgra/hw/rtl/cgra_pkg.sv.tpl
 	$(PYTHON) util/heepsilon_gen.py --cfg $(HEEPSILON_CFG) --outdir hw/vendor/esl_epfl_cgra/hw/rtl --tpl-sv hw/vendor/esl_epfl_cgra/hw/rtl/peripheral_regs.sv.tpl
 	$(PYTHON) util/heepsilon_gen.py --cfg $(HEEPSILON_CFG) --outdir hw/vendor/esl_epfl_cgra/util --tpl-sv hw/vendor/esl_epfl_cgra/util/cgra_bitstream_gen.py.tpl
@@ -53,7 +64,7 @@ mcu-gen: heepsilon-gen
 ## Builds (synthesis and implementation) the bitstream for the FPGA version using Vivado
 ## @param FPGA_BOARD=nexys-a7-100t,pynq-z2
 ## @param FUSESOC_FLAGS=--flag=<flagname>
-vivado-fpga: |venv
+vivado-fpga: clock-gen |venv
 	$(FUSESOC) --cores-root . run --no-export --target=$(FPGA_BOARD) $(FUSESOC_FLAGS) --setup --build eslepfl:systems:heepsilon 2>&1 | tee buildvivado.log
 
 
@@ -75,7 +86,7 @@ SIM_ARGS += $(if $(MAX_SIM_TIME),+max_sim_time=$(MAX_SIM_TIME))
 ## @section Simulation
 
 ## Verilator simulation build
-verilator-build: |venv
+verilator-build: clock-gen |venv
 	$(FUSESOC) --cores-root . run --no-export --target=sim --tool=verilator $(FUSESOC_FLAGS) --setup --build eslepfl:systems:heepsilon $(FUSESOC_PARAM) 2>&1 | tee buildsim.log
 
 ## First builds the app and then uses Verilator to simulate the HW model and run the FW
@@ -99,7 +110,7 @@ verilator-waves:
 	gtkwave $(VERILATOR_DIR)/waveform.fst
 
 ## Questasim simulation build
-questasim-build: |venv
+questasim-build: clock-gen |venv
 	$(FUSESOC) --cores-root . run --no-export --target=sim --tool=modelsim $(FUSESOC_FLAGS) --setup --build eslepfl:systems:heepsilon $(FUSESOC_PARAM) 2>&1 | tee buildsim.log
 
 ## Questasim simulation with HDL optimized compilation
@@ -107,7 +118,7 @@ questasim-build-opt: questasim-build
 	$(MAKE) -C $(QUESTASIM_DIR) opt
 
 ## VCS simulation build
-vcs-build: |venv
+vcs-build: clock-gen |venv
 	$(FUSESOC) --cores-root . run --no-export --target=sim --tool=vcs $(FUSESOC_FLAGS) --setup --build eslepfl:systems:heepsilon $(FUSESOC_PARAM) 2>&1 | tee buildsim.log
 
 # Legacy aliases (for backwards compatibility with old HEEPsilon targets)
@@ -150,7 +161,7 @@ XHEEP_MAKE = $(HEEP_DIR)/external.mk
 include $(XHEEP_MAKE)
 
 # Add a dependency on the existing app target of XHEEP to create a link to the build folder
-app: link_build
+app: clock-gen link_build
 
 clean-app: link_rm
 

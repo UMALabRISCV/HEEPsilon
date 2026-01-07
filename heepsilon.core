@@ -40,6 +40,7 @@ filesets:
 
   tb-harness:
     files:
+    - tb/heepsilon_clock_config.svh: {is_include_file: true}
     - tb/tb_util.svh: {is_include_file: true}
     - tb/testharness.sv
     file_type: systemVerilogSource
@@ -89,6 +90,7 @@ filesets:
 
   tb-verilator:
     files:
+    - tb/heepsilon_clock_config.hh: { is_include_file: true }
     - tb/XHEEP_CmdLineOptions.hh: { is_include_file: true }
     - tb/XHEEP_CmdLineOptions.cpp
     - tb/tb_top.cpp

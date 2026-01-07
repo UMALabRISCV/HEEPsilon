@@ -11,7 +11,11 @@
 extern "C" {
 #endif  // __cplusplus
 
-#define REFERENCE_CLOCK_Hz 15*1000*1000
+#include "heepsilon_clock_config.h"
+
+#ifndef REFERENCE_CLOCK_Hz
+#define REFERENCE_CLOCK_Hz HEEPSILON_CPU_CLK_HZ
+#endif
 #define UART_BAUDRATE 9600
 #define TARGET_ZCU102 1
 #define TARGET_IS_FPGA 1

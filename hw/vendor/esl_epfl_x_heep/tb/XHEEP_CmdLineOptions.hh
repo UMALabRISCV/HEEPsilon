@@ -3,7 +3,9 @@
 
 #include <iostream>
 
-#define CLK_FREQUENCY_kHz (100*1000)
+#include "heepsilon_clock_config.hh"
+
+#define CLK_FREQUENCY_kHz (HEEPSILON_CPU_CLK_KHZ)
 #define CLK_PERIOD_ps (1000*1000*1000 / CLK_FREQUENCY_kHz)
 
 class XHEEP_CmdLineOptions // declare Calculator class

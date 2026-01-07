@@ -165,6 +165,26 @@ cat uart0.log
 
 ---
 
+## Clock Configuration (CPU/CGRA)
+
+HEEPsilon currently runs the CPU and CGRA from the same system clock. You can adjust it from a single place:
+
+1. Edit `clock_config.mk` and set `HEEPSILON_CPU_CLK_HZ` (and optionally `HEEPSILON_CGRA_CLK_HZ`).
+2. Run `make clock-gen` (or any target that depends on it, e.g. `make mcu-gen` or `make app`).
+
+This regenerates:
+- `tb/heepsilon_clock_config.svh` and `tb/heepsilon_clock_config.hh` for simulation (SV + Verilator)
+- `sw/device/heepsilon_clock_config.h` for software (`REFERENCE_CLOCK_Hz`)
+
+Example:
+```bash
+make clock-gen HEEPSILON_CPU_CLK_HZ=50000000 HEEPSILON_CGRA_CLK_HZ=50000000
+```
+
+> For FPGA targets, ensure the clock wizard output matches the same frequency (see `hw/fpga_cgra/scripts/*/xilinx_generate_clk_wizard.tcl`).
+
+---
+
 ## Documentation
 
 ### CGRA Development Tools
