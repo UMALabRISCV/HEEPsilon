@@ -117,15 +117,19 @@ jobs:
       - name: Pull CI image
         run: docker pull ${{ needs.build.outputs.image }}
 
-      - name: Run hello_world
+      - name: Run and verify hello_world
         run: |
           docker run --rm ${{ needs.build.outputs.image }} \
-            bash -c "make verilator-run-app PROJECT=hello_world && cat build/eslepfl_systems_heepsilon_0/sim-verilator/uart0.log"
-
-      - name: Verify output
-        run: |
-          docker run --rm ${{ needs.build.outputs.image }} \
-            bash -c "grep -q 'hello world!' build/eslepfl_systems_heepsilon_0/sim-verilator/uart0.log && echo '✅ PASSED'"
+            bash -c '
+              make verilator-run-app PROJECT=hello_world
+              cat build/eslepfl_systems_heepsilon_0/sim-verilator/uart0.log
+              if grep -q "hello world!" build/eslepfl_systems_heepsilon_0/sim-verilator/uart0.log; then
+                echo "✅ hello_world PASSED"
+              else
+                echo "❌ hello_world FAILED"
+                exit 1
+              fi
+            '
 
   # ==========================================================================
   # CGRA Tests (Parallel Matrix)
